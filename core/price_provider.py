@@ -1,12 +1,14 @@
-import os
+from pathlib import Path
 import sqlite3
 import ccxt
 import pandas as pd
-from pathlib import Path
 
+
+# === PATH BASE PROGETTO ===
 BASE_DIR = Path(__file__).resolve().parent
-PRICES_DIR = BASE_DIR.parent / "prices"
-DB_PATH = os.path.join(PRICES_DIR, 'price_history.db')
+PROJECT_ROOT = BASE_DIR.parent
+PRICES_DIR = PROJECT_ROOT / "prices"
+DB_PATH = PRICES_DIR / "price_history.db"
 
 
 SYMBOL_ALIASES = {
@@ -20,26 +22,31 @@ class PriceProvider:
         self.cex_priority = ['binance', 'kraken', 'bitstamp']
         self._exchange_instances = {}
         self._exchange_markets = {}
-
-        self.db_path = DB_PATH
-        self.conn = sqlite3.connect(self.db_path)
+        
+        self.conn = sqlite3.connect(DB_PATH)
         self.conn.execute('PRAGMA journal_mode=WAL')
         self.init_db()
         
-        csv_path = os.path.join(PRICES_DIR, 'EURUSD.csv')
-        self.df_eurusd = pd.read_csv(csv_path)
-        self.df_eurusd = self.df_eurusd.set_index('timestamp')
-        self.df_eurusd = self.df_eurusd.sort_index()
-                
-        csv_path = os.path.join(PRICES_DIR, 'BTCEUR.csv')
-        self.df_btceur = pd.read_csv(csv_path)
-        self.df_btceur = self.df_btceur.set_index('timestamp')
-        self.df_btceur = self.df_btceur.sort_index()
-        
-        csv_path = os.path.join(PRICES_DIR, 'MXNEUR.csv')
-        self.df_mxneur = pd.read_csv(csv_path)
-        self.df_mxneur = self.df_mxneur.set_index('timestamp')
-        self.df_mxneur = self.df_mxneur.sort_index()
+        # sempre in memoria
+        self.df_eurusd = self._load_price_file("EURUSD.csv")
+        self.df_btceur = self._load_price_file("BTCEUR.csv")
+
+        # cache dinamica per altre fiat
+        self._fiat_cache = {}
+
+    def _load_price_file(self, filename):
+        path = PRICES_DIR / filename
+        df = pd.read_csv(path)
+        df = df.set_index('timestamp')
+        df = df.sort_index()
+        return df
+    
+    def get_fiat_df(self, fiat):
+        if fiat not in self._fiat_cache:
+            filename = f"{fiat}EUR.csv"
+            self._fiat_cache[fiat] = self._load_price_file(filename)
+
+        return self._fiat_cache[fiat]
 
     def init_db(self):
         c = self.conn.cursor()
@@ -68,9 +75,10 @@ class PriceProvider:
             price = self.df_btceur.iloc[posInd]['price']
             return price
         
-        if asset == 'MXN':
-            posInd = self.df_mxneur.index.get_indexer([timestamp], method='nearest')[0]
-            price = self.df_mxneur.iloc[posInd]['price']
+        if asset == "MXN":
+            df_mxneur = self.get_fiat_df("MXN")
+            posInd = df_mxneur.index.get_indexer([timestamp], method='nearest')[0]
+            price = df_mxneur.iloc[posInd]['price']
             return price
         
         posInd = self.df_eurusd.index.get_indexer([timestamp], method='nearest')[0]

@@ -4,7 +4,7 @@ Motore di calcolo fiscale per operazioni crypto multi-exchange.
 
 ---
 
-## ? Obiettivo
+##  Obiettivo
 
 TaxEngine permette di:
 
@@ -21,35 +21,37 @@ Il progetto è pensato per essere:
 
 ---
 
-## ? Struttura del progetto
+##  Struttura del progetto
+
 
 ```
 TaxEngine/
 ?
-??? Library/                      # motore fiscale + gestione prezzi
+??? core/                        # motore fiscale e logica principale
+?   ??? crypto_tax_engine.py
+?   ??? crypto_tax_lib.py
+?   ??? price_provider.py
 ?
-??? Exchanges/                    # parser per ciascun exchange
+??? prices/                      # database e CSV prezzi storici
+?   ??? price_history.db
+?   ??? EURUSD.csv
+?   ??? BTCEUR.csv
+?   ??? MXNEUR.csv
 ?
-??? Data/
-?   ??? DataBase/                 # eventuali database locali
-?   ?
-?   ??? ExchangesData/
-?       ??? Kraken/
-?       ?   ??? Dati/             # report originali scaricati dal CEX (non versionati)
-?       ?   ??? Kraken_cex_report.csv
-?       ?   ??? Kraken_events.csv
-?       ?   ??? Kraken_tax.csv
-?       ?
-?       ??? BitMex/
-?       ??? BitFinex/
-?       ??? ...
+??? Exchanges/                   # parser specifici per ciascun CEX
+?
+??? Data/                        # dati locali (privati, non versionati)
+?
+??? docs/                        # documentazione metodologica
+?   ??? METODOLOGIA_CALCOLO_FISCALE.md
+?   ??? METODOLOGIA_PREZZI_STORICI.md
 ?
 ??? README.md
 ```
 
 ---
 
-## ? Prezzi Storici
+##  Prezzi Storici
 
 La cartella `Library` contiene:
 
@@ -61,7 +63,7 @@ I prezzi sono deterministici e salvati localmente per garantire coerenza nel tem
 
 ---
 
-## ? Cartella Dati
+##  Cartella Dati
 
 La cartella `Dati/` deve contenere:
 
@@ -71,7 +73,7 @@ La cartella `Dati/` deve contenere:
 ? Non è pensata per essere tracciata su GitHub.
 
 ---
-## ? Gestione report CEX
+##  Gestione report CEX
 
 Per ogni exchange:
 
@@ -86,7 +88,7 @@ La struttura è pensata per:
 - poter rieseguire il motore in modo replicabile
 
 
-## ? Filosofia
+##  Filosofia
 
 Ogni movimento viene:
 
@@ -100,13 +102,13 @@ ma poter spiegare ogni singolo passaggio del calcolo.
 
 ---
 
-## ? Stato del progetto
+##  Stato del progetto
 
 Progetto personale in evoluzione continua.
 Pensato per utilizzo pluriennale.
 
 ---
 
-## ? Autore
+##  Autore
 
 MaloMax

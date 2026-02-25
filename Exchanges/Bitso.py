@@ -28,7 +28,7 @@ df.columns = ['method', 'currency', 'timestamp', 'datetime', 'address', 'xrptag'
 
 
 df['row_order'] = range(len(df))
-df['Timestamp'] = pd.to_datetime(df['datetime'], errors='coerce', utc=True)
+df['Timestamp'] = pd.to_datetime(df['data'], errors='coerce', utc=True)
 
 df_valid = (
     df.dropna(subset=['Timestamp'])
