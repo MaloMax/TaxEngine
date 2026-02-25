@@ -2,7 +2,7 @@ import sys
 import os
 import pandas as pd
 
-LIBRARY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Library")
+LIBRARY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "core")
 sys.path.append(LIBRARY_DIR)
 
 from crypto_tax_lib import tax_lib

@@ -2,9 +2,12 @@ import os
 import sqlite3
 import ccxt
 import pandas as pd
+from pathlib import Path
 
-LIBRARY_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(LIBRARY_DIR, 'price_history.db')
+BASE_DIR = Path(__file__).resolve().parent
+PRICES_DIR = BASE_DIR.parent / "prices"
+DB_PATH = os.path.join(PRICES_DIR, 'price_history.db')
+
 
 SYMBOL_ALIASES = {
     "MATIC": "POL",
@@ -23,26 +26,20 @@ class PriceProvider:
         self.conn.execute('PRAGMA journal_mode=WAL')
         self.init_db()
         
-        csv_path = os.path.join(LIBRARY_DIR, 'EURUSD.csv')
+        csv_path = os.path.join(PRICES_DIR, 'EURUSD.csv')
         self.df_eurusd = pd.read_csv(csv_path)
         self.df_eurusd = self.df_eurusd.set_index('timestamp')
         self.df_eurusd = self.df_eurusd.sort_index()
-        
-        print("EURUSDT pronto")
-        
-        csv_path = os.path.join(LIBRARY_DIR, 'BTCEUR.csv')
+                
+        csv_path = os.path.join(PRICES_DIR, 'BTCEUR.csv')
         self.df_btceur = pd.read_csv(csv_path)
         self.df_btceur = self.df_btceur.set_index('timestamp')
         self.df_btceur = self.df_btceur.sort_index()
-        print("BTCEUR pronto")
         
-        csv_path = os.path.join(LIBRARY_DIR, 'MXNEUR.csv')
+        csv_path = os.path.join(PRICES_DIR, 'MXNEUR.csv')
         self.df_mxneur = pd.read_csv(csv_path)
         self.df_mxneur = self.df_mxneur.set_index('timestamp')
         self.df_mxneur = self.df_mxneur.sort_index()
-        print("MXNEUR pronto")
-        
-        
 
     def init_db(self):
         c = self.conn.cursor()

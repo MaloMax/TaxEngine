@@ -254,7 +254,7 @@ class CryptoTaxLib:
         Struttura attesa:
 
         TAX/
-        ├── Library/
+        ├── core/
         ├── Exchanges/
         └── Data/
              ├── DataBase/
@@ -265,7 +265,6 @@ class CryptoTaxLib:
         # BASE_DIR = cartella TAX
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-        library_dir = os.path.join(base_dir, "Library")
         data_dir = os.path.join(base_dir, "Data")
         database_dir = os.path.join(data_dir, "DataBase")
         exchanges_data_dir = os.path.join(data_dir, "ExchangesData")
@@ -276,7 +275,6 @@ class CryptoTaxLib:
 
         return {
             #"base_dir": base_dir,
-            #"library_dir": library_dir,
             #"data_dir": data_dir,
             #"database": database_dir,
             #"cex_dir": cex_dir,
@@ -292,18 +290,6 @@ class CryptoTaxLib:
         
         headers = list(row_dict.keys())
 
-        # cartella Tax (una sopra Library)
-        #base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        #result_dir = os.path.join(base_dir, "Result")
-        #os.makedirs(result_dir, exist_ok=True)
-
-        #file_path = os.path.join(result_dir, filename)
-
-        #file_exists = os.path.isfile(file_path)
-
-        #with open(file_path, "a", newline="", encoding="utf-8") as csvfile:
-            
-
         file_exists = os.path.isfile(filename)
 
         with open(filename, "a", newline="", encoding="utf-8") as csvfile:
@@ -315,15 +301,9 @@ class CryptoTaxLib:
             writer.writerow(row_dict)
 
     def reset_result_file(self,filename):
-        #base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        #result_dir = os.path.join(base_dir, "Result")
-        #file_path = os.path.join(result_dir, filename)
 
-        #if os.path.exists(file_path):
-            #os.remove(file_path)
         if os.path.exists(filename):
             os.remove(filename)
-            print(f"File {filename} cancellato.")
             
     def salva_report_fiscale(self, exchange, anno, saldo=0, plus=0, minus=0, redditiP=0, redditiM=0):
         """Salva/aggiorna report anno-exchange."""
