@@ -88,6 +88,16 @@ class CryptoTaxEngine:
             total_cost += used * last_cost
             remaining -= used
 
+            
+            # Se lotto non completamente consumato lo reinserisco in testa.
+            #
+            # Deve rimanere il lotto "più vecchio" anche dopo un consumo
+            # parziale, altrimenti si rompe l'ordine FIFO sulle operazioni
+            # successive (append lo sposterebbe in coda).
+            if last_qty > used:
+                self.purchases[asset].insert(0, (last_qty - used, last_cost))
+
+                
             # Se lotto non completamente consumato lo reinserisco
             if last_qty > used:
                 self.purchases[asset].append((last_qty - used, last_cost))
@@ -387,3 +397,4 @@ class CryptoTaxEngine:
         print("\n=== PURCHASES ===")
         for k, v in self.purchases.items():
             print(k, v)
+            

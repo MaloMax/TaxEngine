@@ -1,114 +1,169 @@
-# TaxEngine
+﻿TaxEngine
 
-Motore di calcolo fiscale per operazioni crypto multi-exchange.
+Motore deterministico di calcolo fiscale per operazioni crypto multi-exchange.
 
----
+TaxEngine nasce per risolvere un problema concreto:
+ricostruire in modo coerente, verificabile e replicabile la fiscalità di operazioni crypto provenienti da più exchange centralizzati (CEX).
 
-##  Obiettivo
+Perché questo progetto
 
-TaxEngine permette di:
+Gli strumenti fiscali disponibili online sono spesso:
 
-- Importare report da diversi CEX
-- Normalizzare eventi (trade, depositi, prelievi, fee)
-- Risolvere prezzi storici in EUR
-- Generare un risultato fiscale coerente e verificabile
+opachi
 
-Il progetto � pensato per essere:
-- deterministico
-- auditabile
-- modulare
-- indipendente dall�exchange
+non replicabili
 
----
+dipendenti da API esterne
 
-##  Struttura del progetto
+non verificabili nel tempo
 
+difficili da auditare
 
-```
+TaxEngine è progettato con un obiettivo diverso:
+
+Ogni numero deve poter essere spiegato.
+
+Obiettivi principali
+
+Importare report CSV originali dai vari CEX
+
+Normalizzare ogni evento (trade, depositi, prelievi, fee)
+
+Risolvere prezzi storici in EUR in modo deterministico
+
+Applicare una metodologia documentata
+
+Generare risultati fiscali replicabili nel tempo
+
+Principi di progettazione
+
+Il progetto è costruito per essere:
+
+Deterministico
+
+Auditabile
+
+Modulare
+
+Indipendente dall’exchange
+
+Indipendente da API esterne
+
+Riproducibile a distanza di anni
+
+I prezzi storici vengono salvati localmente per evitare variazioni nel tempo.
+
+Struttura del progetto
 TaxEngine/
-?
-??? core/                        # motore fiscale e logica principale
-?   ??? crypto_tax_engine.py
-?   ??? crypto_tax_lib.py
-?   ??? price_provider.py
-?
-??? prices/                      # database e CSV prezzi storici
-?   ??? price_history.db
-?   ??? EURUSD.csv
-?   ??? BTCEUR.csv
-?   ??? MXNEUR.csv
-?
-??? Exchanges/                   # parser specifici per ciascun CEX
-?
-??? Data/                        # dati locali (privati, non versionati)
-?
-??? docs/                        # documentazione metodologica
-?   ??? METODOLOGIA_CALCOLO_FISCALE.md
-?   ??? METODOLOGIA_PREZZI_STORICI.md
-?
-??? README.md
-```
+│
+├── core/                        # motore fiscale e logica principale
+│   ├── crypto_tax_engine.py
+│   ├── crypto_tax_lib.py
+│   └── price_provider.py
+│
+├── prices/                      # database e CSV prezzi storici
+│   ├── price_history.db
+│   ├── EURUSD.csv
+│   ├── BTCEUR.csv
+│   └── MXNEUR.csv
+│
+├── Exchanges/                   # parser specifici per ciascun CEX
+│
+├── Data/                        # dati locali (non versionati)
+│
+├── docs/                        # documentazione metodologica
+│   ├── METODOLOGIA_CALCOLO_FISCALE.md
+│   └── METODOLOGIA_PREZZI_STORICI.md
+│
+└── README.md
+Come funziona
 
----
+Ogni movimento viene processato in quattro fasi:
 
-##  Prezzi Storici
+Parsing del report originale
 
-La cartella `Library` contiene:
+Normalizzazione dell’evento
 
-- database prezzi (`price_history.db`)
-- CSV di riferimento (EURUSD, BTCEUR, MXNEUR)
-- logica di risoluzione prezzi (`price_provider.py`)
+Risoluzione del prezzo storico in EUR
 
-I prezzi sono deterministici e salvati localmente per garantire coerenza nel tempo.
+Elaborazione secondo la metodologia fiscale
 
----
+Il risultato non è solo un totale, ma una ricostruzione coerente di ogni passaggio.
 
-##  Cartella Dati
+Prezzi Storici
 
-La cartella `Dati/` deve contenere:
+I prezzi sono:
 
-- report CSV esportati dai vari exchange
-- file originali non modificati
+salvati in locale
 
-? Non � pensata per essere tracciata su GitHub.
+non dipendenti da chiamate API live
 
----
-##  Gestione report CEX
+coerenti nel tempo
+
+deterministici
+
+Il sistema utilizza:
+
+CSV di riferimento (EURUSD, BTCEUR, ecc.)
+
+un database SQLite locale
+
+una logica di fallback documentata
+
+Questo garantisce che lo stesso input produca sempre lo stesso output.
+
+Gestione dei report CEX
 
 Per ogni exchange:
 
-- `Dati/` contiene i file originali scaricati
-- I file vengono poi copiati e rinominati in:
-  - `CEX_cex_report.csv`
+I file originali vengono conservati intatti
 
-La struttura � pensata per:
+Il parsing è separato dalla logica fiscale
 
-- mantenere gli originali intatti
-- separare parsing e calcolo
-- poter rieseguire il motore in modo replicabile
+Ogni exchange ha il proprio modulo dedicato
 
+Questo permette:
 
-##  Filosofia
+aggiunta di nuovi CEX senza modificare il motore centrale
 
-Ogni movimento viene:
+controllo completo del flusso dati
 
-1. Parsato
-2. Normalizzato
-3. Valorizzato in EUR
-4. Elaborato secondo la metodologia documentata
+audit indipendente per singolo exchange
 
-L�obiettivo non � solo ottenere un numero,
-ma poter spiegare ogni singolo passaggio del calcolo.
-
----
-
-##  Stato del progetto
+Stato del progetto
 
 Progetto personale in evoluzione continua.
 Pensato per utilizzo pluriennale.
 
----
+Attualmente supporta:
 
-##  Autore
+parsing modulare
+
+risoluzione prezzi multi-valuta
+
+database storico locale
+
+struttura espandibile per nuovi exchange
+
+Requisiti
+
+Python 3.10+
+
+SQLite
+
+pandas
+
+ccxt (per eventuali integrazioni)
+
+Filosofia
+
+TaxEngine non è un tool “magico”.
+
+È un motore trasparente.
+
+L’obiettivo non è solo ottenere un numero finale,
+ma poter spiegare ogni singolo passaggio del calcolo.
+
+Autore
 
 MaloMax

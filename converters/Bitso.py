@@ -52,7 +52,7 @@ for idx, row in df.iterrows():
             'asset_b': row.minor,
             'qty_b': row.value,
             'fee_b': row.fee if row.Type == 'sell' else 0.0,
-            'address': row.address if pd.notna(row.address) else '-'
+            'address': row.get('address', '')
         }
         
     elif source == 'prelievi_Bitso.csv':  
