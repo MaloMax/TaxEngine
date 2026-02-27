@@ -28,14 +28,14 @@ df.columns = ['type', 'major', 'minor', 'amount', 'rate', 'value', 'fee', 'total
 for idx, row in df.iterrows():
           
     event = {
-        'timestamp': row.timestamp,
+        'timestamp': con_lib.to_timestamp(row.timestamp),
         'type': row.type,
         'asset': row.major,
-        'qty': row.amount,
-        'fee': row.fee if row.type == 'buy' else 0.0,
+        'qty': con_lib.to_float(row.amount),
+        'fee': con_lib.to_float(row.fee) if row.type == 'buy' else 0.0,
         'asset_b': row.minor,
-        'qty_b': row.value,
-        'fee_b': row.fee if row.type == 'sell' else 0.0,
+        'qty_b': con_lib.to_float(row.value),
+        'fee_b': con_lib.to_float(row.fee) if row.type == 'sell' else 0.0,
         'address': row.get('address', '')
     }
 

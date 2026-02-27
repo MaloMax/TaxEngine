@@ -8,7 +8,7 @@ sys.path.append(LIBRARY_DIR)
 
 from converter_lib import con_lib
 
-NomeRepFile = "trading_Bitso.csv"
+NomeRepFile = "prelievi_Bitso.csv"
 CexName = "Bitso"
 skiprows = 0
 
@@ -22,23 +22,26 @@ EventsFile = os.path.join(paths["events"], f"{nome_file}_event.csv")
 con_lib.reset_result_file(EventsFile)
 
 df = pd.read_csv(ReportFile, skiprows=skiprows, on_bad_lines='skip')
-  
-df.columns = ['type', 'major', 'minor', 'amount', 'rate', 'value', 'fee', 'total', 'timestamp', 'datetime']  
+
+df.columns = ['method', 'currency', 'amount', 'timestamp', 'datetime', 'address', 'xrptag']  
 
 for idx, row in df.iterrows():
-          
-    event = {
-        'timestamp': row.timestamp,
-        'type': row.type,
-        'asset': row.major,
-        'qty': row.amount,
-        'fee': row.fee if row.type == 'buy' else 0.0,
-        'asset_b': row.minor,
-        'qty_b': row.value,
-        'fee_b': row.fee if row.type == 'sell' else 0.0,
-        'address': row.get('address', '')
-    }
 
+
+    event = {
+        'timestamp': con_lib.to_timestamp(row.timestamp),
+        'type': 'withdrawal',
+        'asset': row.currency,
+        'qty': con_lib.to_float(row.amount),
+        'fee': 0.0,
+        'asset_b': '',
+        'qty_b': 0,
+        'fee_b': 0,
+        'address': row.address if pd.notna(row.address) else ''
+    }
+    
+    
+        
     save_row = {
         **event,
         'Exchange':CexName,
