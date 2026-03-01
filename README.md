@@ -53,29 +53,26 @@ Riproducibile a distanza di anni
 
 I prezzi storici vengono salvati localmente per evitare variazioni nel tempo.
 
-Struttura del progetto
+## Struttura del progetto
+
+```text
 TaxEngine/
-│
 ├── core/                        # motore fiscale e logica principale
 │   ├── crypto_tax_engine.py
 │   ├── crypto_tax_lib.py
 │   └── price_provider.py
-│
 ├── prices/                      # database e CSV prezzi storici
 │   ├── price_history.db
 │   ├── EURUSD.csv
 │   ├── BTCEUR.csv
 │   └── MXNEUR.csv
-│
-├── Exchanges/                   # parser specifici per ciascun CEX
-│
+├── converters/                  # parser specifici per ciascun CEX
 ├── Data/                        # dati locali (non versionati)
-│
 ├── docs/                        # documentazione metodologica
 │   ├── METODOLOGIA_CALCOLO_FISCALE.md
 │   └── METODOLOGIA_PREZZI_STORICI.md
-│
 └── README.md
+```
 Come funziona
 
 Ogni movimento viene processato in quattro fasi:
