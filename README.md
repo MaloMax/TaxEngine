@@ -1,4 +1,4 @@
-﻿TaxEngine
+TaxEngine
 
 Motore deterministico di calcolo fiscale per operazioni crypto multi-exchange.
 
