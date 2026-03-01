@@ -23,6 +23,8 @@ con_lib.reset_result_file(EventsFile)
 
 df = pd.read_csv(ReportFile, skiprows=skiprows, on_bad_lines='skip')
 
+df["timestamp"] = df["time"].apply(con_lib.to_timestamp)
+df = df.sort_values("timestamp").reset_index(drop=True)
 
 #txid	refid	time	type	subtype	aclass	subclass	asset	wallet	amount	fee	balance	address
 
@@ -43,7 +45,7 @@ while idx < len(df):
                 row, row2 = row2, row
         
         event = {
-            'timestamp': con_lib.to_timestamp(row.time),
+            'timestamp': row.timestamp,
             'type': 'buy' if row.amount > 0 else 'sell',
             'asset': row.asset,
             'qty': con_lib.to_float(row.amount),
@@ -58,7 +60,7 @@ while idx < len(df):
         
 
         event = {
-            'timestamp': con_lib.to_timestamp(row.time),
+            'timestamp': row.timestamp,
             'type': row.type,
             'asset': row.asset,
             'qty': con_lib.to_float(row.amount),

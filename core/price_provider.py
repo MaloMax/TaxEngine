@@ -2,7 +2,7 @@ from pathlib import Path
 import sqlite3
 import ccxt
 import pandas as pd
-
+from datetime import datetime
 
 # === PATH BASE PROGETTO ===
 BASE_DIR = Path(__file__).resolve().parent
@@ -19,7 +19,7 @@ SYMBOL_ALIASES = {
 class PriceProvider:
 
     def __init__(self):
-        self.cex_priority = ['binance', 'kraken', 'bitstamp']
+        self.cex_priority = ['binance', 'kraken', 'bitstamp', 'bitmex', 'bitfinex']
         self._exchange_instances = {}
         self._exchange_markets = {}
         
@@ -81,10 +81,10 @@ class PriceProvider:
             price = df_mxneur.iloc[posInd]['price']
             return price
         
-        posInd = self.df_eurusd.index.get_indexer([timestamp], method='nearest')[0]
-        priceUSD = 1 / self.df_eurusd.iloc[posInd]['price']
         
         if self.isUsd(asset):
+            posInd = self.df_eurusd.index.get_indexer([timestamp], method='nearest')[0]
+            priceUSD = 1 / self.df_eurusd.iloc[posInd]['price']
             return priceUSD
         
         asset = SYMBOL_ALIASES.get(asset, asset)
@@ -98,9 +98,12 @@ class PriceProvider:
 
 
         pairs_to_try = [
+            f"{asset}/EUR",
+            f"{asset}/BTC",
             f"{asset}/USD",
             f"{asset}/USDC",
-            f"{asset}/USDT"
+            f"{asset}/USDT",
+            f"{asset}/USDT:USDT"
         ]
 
         for ex_id in self.cex_priority:
@@ -110,24 +113,41 @@ class PriceProvider:
                 continue
 
             symbols = self._exchange_markets.get(ex_id, [])
-
+            
+            if f"{asset}/EUR" in pairs_to_try:
+                priceMulty = 1
+            elif f"{asset}/BTC" in pairs_to_try:
+                posInd = self.df_btceur.index.get_indexer([timestamp], method='nearest')[0]
+                price = self.df_btceur.iloc[posInd]['price']
+            else:
+                posInd = self.df_eurusd.index.get_indexer([timestamp], method='nearest')[0]
+                priceMulty = 1 / self.df_eurusd.iloc[posInd]['price']
+                        
             for pair in pairs_to_try:
                 if pair in symbols:
                     try:
                         print(f"Trovato {pair} su {ex_id}")
 
                         raw_price = self.get_price_ccxt(ex_id, pair, timestamp)
-
-                        if raw_price is not None:
+                        
+                        
+                        if ex_id == 'bitmex' and pair == 'BMEX/USDT':
+                            print (' ---------- ', ex_id, pair, datetime.utcfromtimestamp(timestamp) ,raw_price)
+                            if raw_price is None:
+                                self._save_price_db(asset, timestamp, 0)
+                                return 0
                             
-                            RetPrice = raw_price * priceUSD
+                        if raw_price is None:
+                            raise ValueError(f"Prezzo non disponibile per {pair} su {ex_id}")
+                        
+                        RetPrice = raw_price * priceMulty
 
-                            self._save_price_db(asset, timestamp, RetPrice)
-                            return RetPrice
+                        self._save_price_db(asset, timestamp, RetPrice)
+                        return RetPrice
 
                     except Exception as e:
                         print(f"Errore fetch {pair} su {ex_id}: {e}")
-
+                        
         raise ValueError(f"Impossibile recuperare prezzo per {asset}")
         
     def _get_exchange(self, ex_id):

@@ -45,6 +45,7 @@ class CryptoTaxEngine:
 
         # Lotti FIFO per ogni asset
         self.purchases = defaultdict(list)
+        self.negativeFifo = defaultdict(list)
 
         # Saldi correnti
         self.balances = defaultdict(float)
@@ -88,26 +89,49 @@ class CryptoTaxEngine:
             total_cost += used * last_cost
             remaining -= used
 
-            
             # Se lotto non completamente consumato lo reinserisco in testa.
             #
             # Deve rimanere il lotto "più vecchio" anche dopo un consumo
             # parziale, altrimenti si rompe l'ordine FIFO sulle operazioni
             # successive (append lo sposterebbe in coda).
+            
             if last_qty > used:
                 self.purchases[asset].insert(0, (last_qty - used, last_cost))
-
-                
-            # Se lotto non completamente consumato lo reinserisco
-            if last_qty > used:
-                self.purchases[asset].append((last_qty - used, last_cost))
-
+        
+        if remaining > 0:
+            ValStor = self.negativeFifo.get(asset, 0)
+            self.negativeFifo[asset] = ValStor + remaining
+        
         if invalid or qty == 0:
             return 0.0
-
+        
         return total_cost / qty
 
+    def _add_Fifo(self, asset, net_qty, price):
 
+        if net_qty <= 0:
+            return
+
+        neg = self.negativeFifo.get(asset, 0.0)
+
+        # Se ho quantità negative da compensare
+        if neg > 0:
+
+            if net_qty <= neg:
+                # Compenso solo il negativo
+                self.negativeFifo[asset] = neg - net_qty
+                return
+            else:
+                # Compenso tutto il negativo e resta qualcosa
+                net_qty -= neg
+                self.negativeFifo[asset] = 0.0
+
+        # Se arrivo qui, la quantità residua va in FIFO
+        if net_qty > 0:
+            if asset not in self.purchases:
+                self.purchases[asset] = []
+
+            self.purchases[asset].append((net_qty, price))
 
 
     # ============================================================
@@ -131,19 +155,19 @@ class CryptoTaxEngine:
         tsStr = str(ts)
         plus = 0
         diversi = 0
-
+        
         # --------------------------------------------------------
         # Normalizzazione dati numerici
         # --------------------------------------------------------
         asset = event['asset']
         qty = self.tax_lib.to_float(event['qty'], 'qty '+tsStr)
         fee = self.tax_lib.to_float(event['fee'], 'fee '+tsStr)
-        fee = 0.0 if pd.isna(fee) else fee
+        fee = 0.0 if pd.isna(fee) else abs(fee)
 
         asset_b = event.get('asset_b', '')
         qty_b = self.tax_lib.to_float(event.get('qty_b', 0), 'qty_b '+tsStr)
         fee_b = self.tax_lib.to_float(event.get('fee_b', 0), 'fee_b '+tsStr)
-        fee_b = 0.0 if pd.isna(fee_b) else fee_b
+        fee_b = 0.0 if pd.isna(fee_b) else abs(fee_b)
 
         # --------------------------------------------------------
         # Gestione cambio anno fiscale
@@ -161,7 +185,7 @@ class CryptoTaxEngine:
         # - Nessuna plus/minus generata
         # ========================================================
 
-        if typ == 'buy':
+        if typ.upper() == 'BUY':
             
             qty_out = abs(qty_b) + fee_b   # qty e' negativo . fee positivo ma un costo .. quantity -99 , fee 1 .. esce 100 
 
@@ -173,7 +197,7 @@ class CryptoTaxEngine:
 
             price = valEur / (qty - fee)
 
-            self.purchases[asset].append(((qty - fee), price))
+            self._add_Fifo(asset, (qty - fee), price)
             self.balances[asset] += (qty - fee)
             self.balances[asset_b] -= qty_out
             
@@ -186,7 +210,7 @@ class CryptoTaxEngine:
         # 3) Genero plus/minus per anno
         # ========================================================
 
-        elif typ == 'sell':
+        elif typ.upper() == 'SELL':
 
             qty_out = abs(qty) + fee
             qty_in = qty_b - fee_b
@@ -204,11 +228,11 @@ class CryptoTaxEngine:
             elif self.tax_lib.price_lib.isTax(asset_b):
                 valUsd = self.tax_lib.price_lib.prezzo(asset_b,ts)
                 valEur = qty_in * valUsd
-                self.purchases[asset_b].append((qty_in, valUsd))
+                self._add_Fifo(asset_b, qty_in, valUsd)
                 
             else:
                 valEur = 0
-                self.purchases[asset_b].append((qty_in, cost_basis / qty_in))
+                self._add_Fifo(asset_b, qty_in,  cost_basis / qty_in)
 
             if valEur > 0:
                 plus = valEur - cost_basis
@@ -232,13 +256,12 @@ class CryptoTaxEngine:
         # ========================================================
 
             
-        elif typ in ('reward', 'airdrop', 'rollover', 'margin', 'staking', 'transfer'):
+        elif typ.upper() in ('REWARD', 'AIRDROP', 'ROLLOVER', 'MARGIN', 'STAKING', 'TRANSFER', 'REALISEDPNL', 'FUNDING'):
             
             qty_in = qty - fee
             self.balances[asset] += qty_in
             
-            
-            if asset_b and qty_b:
+            if pd.notna(asset_b) and str(asset_b).strip():
                 price_as = self.tax_lib.price_lib.prezzo(asset_b, ts)
                 val_eur = price_as * qty_b
                 price = val_eur / abs(qty_in)
@@ -250,7 +273,7 @@ class CryptoTaxEngine:
 
             if qty_in > 0:
                 if not self.tax_lib.price_lib.isEuro(asset):
-                    self.purchases[asset].append((qty_in, price))
+                    self._add_Fifo(asset, qty_in,  price)
                 self.diversi_plus[year] += diversi
 
             elif qty_in < 0:
@@ -265,7 +288,7 @@ class CryptoTaxEngine:
         # Registra prelievo per successivo match con deposito
         # ========================================================
 
-        elif typ in ('withdraw', 'withdrawal'):
+        elif typ.upper() in ('WITHDRAW', 'WITHDRAWAL'):
             
             qty_out = abs(qty) + fee
             
@@ -278,6 +301,7 @@ class CryptoTaxEngine:
                     unit_cost, ts, self.exchange
                 )
 
+            self.diversi_minus[year] += fee*unit_cost
             self.balances[asset] -= qty_out
 
         # ========================================================
@@ -286,7 +310,7 @@ class CryptoTaxEngine:
         # Recupera costo storico tramite match
         # ========================================================
 
-        elif typ == 'deposit':
+        elif typ.upper() == 'DEPOSIT':
                         
             qty = qty if qty else qty_b    # in caso di euro a volte e' in qty_b
             qty_in = qty - fee
@@ -303,14 +327,18 @@ class CryptoTaxEngine:
                 elif qty_b > 0 :    # se ho un costo di carico di un prelievo lo metto in qty_b nel parse
                     cost = qty_b
                 
-                self.purchases[asset].append((qty_in, cost))
+                self._add_Fifo(asset, qty_in,  cost)
 
+            self.diversi_minus[year] += fee*cost
             self.balances[asset] += qty_in
 
         else:
+            print(event)
             raise ValueError(f"Tipo evento non gestito: {typ}")
 
         return {
+            'balanceA': self.balances[asset],
+            'balanceB': self.balances[asset_b],
             'plus': plus,
             'diversi': diversi
         }
@@ -343,6 +371,8 @@ class CryptoTaxEngine:
             max_year = max(self.year_end_balances.keys())
         else:
             min_year, max_year = 2017, 2025
+            
+        print('build_report',min_year, max_year)
 
         all_years = range(min_year, max_year + 1)
 
@@ -395,6 +425,9 @@ class CryptoTaxEngine:
             print(k, v)
 
         print("\n=== PURCHASES ===")
+        print("TOT POS:", sum(q for q, _ in self.purchases['BTC']))
+        print("BALANCE:", self.balances['BTC'])
+
         for k, v in self.purchases.items():
             print(k, v)
             
