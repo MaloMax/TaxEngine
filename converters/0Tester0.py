@@ -9,7 +9,7 @@ sys.path.append(LIBRARY_DIR)
 from crypto_tax_lib import tax_lib
 from crypto_tax_engine import CryptoTaxEngine
 
-CexName = "Bitfinex"
+CexName = "Bittrex"
 
 paths = tax_lib.get_cex_paths(CexName)
 
@@ -49,7 +49,6 @@ df = (df.dropna(subset=['timestamp']).sort_values(['timestamp', 'row_order']).re
 
 for idx, row in df.iterrows():
     
-        
     event = {
         'idx': row.idx,
         'timestamp': row.timestamp,
@@ -63,6 +62,7 @@ for idx, row in df.iterrows():
         'address': row.get('address', '')
     }
     
+    #print(event)
             
     result = engine.process_event(event)
     

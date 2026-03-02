@@ -185,7 +185,7 @@ class CryptoTaxEngine:
         # - Nessuna plus/minus generata
         # ========================================================
 
-        if typ.upper() == 'BUY':
+        if typ.upper() in ('BUY', 'BOUGHT'):
             
             qty_out = abs(qty_b) + fee_b   # qty e' negativo . fee positivo ma un costo .. quantity -99 , fee 1 .. esce 100 
 
@@ -201,6 +201,7 @@ class CryptoTaxEngine:
             self.balances[asset] += (qty - fee)
             self.balances[asset_b] -= qty_out
             
+            self.tax_lib.price_lib.register_trade_price(asset , asset_b, qty, qty_b, ts)
 
         # ========================================================
         # SELL (EVENTO IMPONIBILE)
@@ -210,7 +211,7 @@ class CryptoTaxEngine:
         # 3) Genero plus/minus per anno
         # ========================================================
 
-        elif typ.upper() == 'SELL':
+        elif typ.upper() in ('SELL', 'SOLD'):
 
             qty_out = abs(qty) + fee
             qty_in = qty_b - fee_b
@@ -241,7 +242,8 @@ class CryptoTaxEngine:
                 else:
                     self.total_minus[year] += abs(plus)
 
-                    
+            self.tax_lib.price_lib.register_trade_price(asset , asset_b, qty, qty_b, ts)
+                
             #print(event['idx'], 'sell', valEur, qty_out, qty_in, unit_cost, cost_basis)
             #for k, v in self.purchases.items():
                 #print(k, v)
@@ -303,6 +305,7 @@ class CryptoTaxEngine:
 
             self.diversi_minus[year] += fee*unit_cost
             self.balances[asset] -= qty_out
+            
 
         # ========================================================
         # DEPOSIT (NON IMPONIBILE)
@@ -313,7 +316,7 @@ class CryptoTaxEngine:
         elif typ.upper() == 'DEPOSIT':
                         
             qty = qty if qty else qty_b    # in caso di euro a volte e' in qty_b
-            qty_in = qty - fee
+            qty_in = abs(qty) - fee
 
             if not self.tax_lib.price_lib.isEuro(asset):
                 address = event.get('address', 'unknown')
@@ -422,12 +425,14 @@ class CryptoTaxEngine:
 
         print("=== BALANCES ===")
         for k, v in self.balances.items():
-            print(k, v)
+            if v:
+                print(k, v)
 
         print("\n=== PURCHASES ===")
         print("TOT POS:", sum(q for q, _ in self.purchases['BTC']))
         print("BALANCE:", self.balances['BTC'])
 
         for k, v in self.purchases.items():
-            print(k, v)
+            if v:
+                print(k, v)
             

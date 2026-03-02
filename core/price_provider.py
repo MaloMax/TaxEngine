@@ -22,6 +22,7 @@ class PriceProvider:
         self.cex_priority = ['binance', 'kraken', 'bitstamp', 'bitmex', 'bitfinex']
         self._exchange_instances = {}
         self._exchange_markets = {}
+        self.last_trade_price = {}
         
         self.conn = sqlite3.connect(DB_PATH)
         self.conn.execute('PRAGMA journal_mode=WAL')
@@ -34,6 +35,38 @@ class PriceProvider:
         # cache dinamica per altre fiat
         self._fiat_cache = {}
 
+    def register_trade_price(self, base, quote, qty_base, qty_quote, timestamp):
+
+        # Provo a ottenere EUR per uno dei due
+        base_eur = self.prezzo(base, timestamp, True) 
+        quote_eur = self.prezzo(quote, timestamp, True)
+
+        total_eur = None
+
+        if base_eur:
+            total_eur = base_eur * qty_base
+        elif quote_eur:
+            total_eur = quote_eur * qty_quote
+        else:
+            return  # non posso determinare valore
+
+        # Calcolo prezzi impliciti
+        price_base = total_eur / qty_base
+        price_quote = total_eur / qty_quote
+
+        # Registro entrambi
+        self.last_trade_price[base] = {
+            "price_eur": price_base,
+            "timestamp": timestamp,
+            "source": "trade_fallback"
+        }
+
+        self.last_trade_price[quote] = {
+            "price_eur": price_quote,
+            "timestamp": timestamp,
+            "source": "trade_fallback"
+        }
+        
     def _load_price_file(self, filename):
         path = PRICES_DIR / filename
         df = pd.read_csv(path)
@@ -63,7 +96,7 @@ class PriceProvider:
     # =========================
     # API PUBBLICA
     # =========================
-    def prezzo(self, asset, timestamp):
+    def prezzo(self, asset, timestamp, allow_missing=False):
         
         asset = asset.upper()
         
@@ -137,17 +170,24 @@ class PriceProvider:
                                 self._save_price_db(asset, timestamp, 0)
                                 return 0
                             
-                        if raw_price is None:
-                            raise ValueError(f"Prezzo non disponibile per {pair} su {ex_id}")
-                        
-                        RetPrice = raw_price * priceMulty
-
-                        self._save_price_db(asset, timestamp, RetPrice)
-                        return RetPrice
+                        if raw_price:                        
+                            RetPrice = raw_price * priceMulty
+                            self._save_price_db(asset, timestamp, RetPrice)
+                            return RetPrice
 
                     except Exception as e:
                         print(f"Errore fetch {pair} su {ex_id}: {e}")
+        
+        if asset in self.last_trade_price:
+            TimeLast = datetime.utcfromtimestamp(self.last_trade_price[asset]["timestamp"])
+            PriceLast = self.last_trade_price[asset]["price_eur"]
+            print(f"[ALERT] Using fallback trade price for {asset}  {PriceLast}  {TimeLast} -> {datetime.utcfromtimestamp(timestamp)}")
+            return PriceLast
                         
+        if allow_missing:
+            print(f"[WARNING] Missing price for {asset} on {datetime.utcfromtimestamp(timestamp)}")
+            return None 
+
         raise ValueError(f"Impossibile recuperare prezzo per {asset}")
         
     def _get_exchange(self, ex_id):
