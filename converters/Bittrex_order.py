@@ -41,16 +41,22 @@ for file in files:
 
 df = pd.concat(df_list, ignore_index=True)
 
-#df = pd.read_csv(ReportFile, skiprows=skiprows, on_bad_lines='skip')
-
 #TXID	Time (UTC)	Transaction	Order Type	Market	Base	Quote	Price	Quantity (Base)	Fees (Quote)	Total (Quote)	Approx Value (USD)	Time In Force	Notes
        
 df["timestamp"] = (  pd.to_datetime(df["Time (UTC)"], format="%Y-%m-%dT%H:%M:%S", utc=True).astype("int64") // 10**9)
 
 df = df.sort_values("timestamp").reset_index(drop=True)
-
+'''
 print(datetime.utcfromtimestamp(df["timestamp"].min()))
 print(datetime.utcfromtimestamp(df["timestamp"].max()))
+
+btc_fee_buy = df[(df['Quote']=="BTC") &(df['Transaction'] == "Bought")]['Fees (Quote)'].sum()
+btc_fee_sell = df[(df['Quote']=="BTC") &(df['Transaction'] == "Sold")]['Fees (Quote)'].sum()
+
+print("BTC fee BUY :", btc_fee_buy)
+print("BTC fee SELL:", btc_fee_sell)
+print("BTC fee TOTAL:", btc_fee_buy + btc_fee_sell)
+'''
 
 for idx, row in df.iterrows():
     
@@ -66,10 +72,27 @@ for idx, row in df.iterrows():
         'fee': 0.0,
         'asset_b': row.Quote,
         'qty_b': con_lib.to_float(row['Total (Quote)']) + addFee,
-        'fee_b': con_lib.to_float(row['Fees (Quote)']),
+        'fee_b': feeC,
         'address': ''
     }
+    '''
+    feeC = con_lib.to_float(row['Fees (Quote)'])
+    total_quote = con_lib.to_float(row['Total (Quote)'])
 
+    event = {
+        'timestamp': row.timestamp,
+        'type': row.Transaction,
+        'asset': row.Base,
+        'qty': con_lib.to_float(row['Quantity (Base)']),
+        'fee': 0.0,
+        'asset_b': row.Quote,
+        'qty_b': total_quote,      # NON toccare
+        'fee_b': feeC,             # la fee la gestisce il motore
+        'address': ''
+    }
+    '''
+    
+    
     save_row = {
         **event,
         'Exchange':CexName,

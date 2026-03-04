@@ -35,16 +35,8 @@ df = pd.concat(df_list, ignore_index=True)
 
 engine = CryptoTaxEngine(tax_lib, CexName)
 
-
-df_valid = df.copy()
-
-invalid_ts = df_valid['timestamp'].isna().sum()
-
-if invalid_ts > 0:
-    print(f"ATTENZIONE: {invalid_ts} timestamp null trovati")
-    
-df['row_order'] = range(len(df))
-df = (df.dropna(subset=['timestamp']).sort_values(['timestamp', 'row_order']).reset_index(drop=True))
+df = df.sort_values("timestamp").reset_index(drop=True)
+print(df)
 
 
 for idx, row in df.iterrows():
@@ -66,13 +58,14 @@ for idx, row in df.iterrows():
             
     result = engine.process_event(event)
     
+        
     save_row = {
         'idx': idx,
         **event,
         **result
     }
     tax_lib.append_event_to_csv(CexName+'_debug.csv', save_row)
-        
+
         
     
 engine.finalize()

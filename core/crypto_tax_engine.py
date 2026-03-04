@@ -159,7 +159,7 @@ class CryptoTaxEngine:
         # --------------------------------------------------------
         # Normalizzazione dati numerici
         # --------------------------------------------------------
-        asset = event['asset']
+        asset = event['asset'].upper()
         qty = self.tax_lib.to_float(event['qty'], 'qty '+tsStr)
         fee = self.tax_lib.to_float(event['fee'], 'fee '+tsStr)
         fee = 0.0 if pd.isna(fee) else abs(fee)
@@ -201,7 +201,7 @@ class CryptoTaxEngine:
             self.balances[asset] += (qty - fee)
             self.balances[asset_b] -= qty_out
             
-            self.tax_lib.price_lib.register_trade_price(asset , asset_b, qty, qty_b, ts)
+            self.tax_lib.price_lib.register_trade_price(asset , asset_b, qty, qty_out, ts)
 
         # ========================================================
         # SELL (EVENTO IMPONIBILE)
@@ -303,7 +303,7 @@ class CryptoTaxEngine:
                     unit_cost, ts, self.exchange
                 )
 
-            self.diversi_minus[year] += fee*unit_cost
+            self.diversi_minus[year] += fee * self.tax_lib.price_lib.prezzo(asset, ts)
             self.balances[asset] -= qty_out
             
 
@@ -332,7 +332,7 @@ class CryptoTaxEngine:
                 
                 self._add_Fifo(asset, qty_in,  cost)
 
-            self.diversi_minus[year] += fee*cost
+            self.diversi_minus[year] += fee * self.tax_lib.price_lib.prezzo(asset, ts)
             self.balances[asset] += qty_in
 
         else:
@@ -340,8 +340,7 @@ class CryptoTaxEngine:
             raise ValueError(f"Tipo evento non gestito: {typ}")
 
         return {
-            'balanceA': self.balances[asset],
-            'balanceB': self.balances[asset_b],
+            'balanceB': self.balances['BTC'],
             'plus': plus,
             'diversi': diversi
         }
@@ -390,7 +389,7 @@ class CryptoTaxEngine:
 
             # Valorizzazione 31 dicembre
             for asset, qty in bals.items():
-                if qty > 0 and asset != 'EUR':
+                if round(qty, 10) > 0 and asset != 'EUR':
                     price = self.tax_lib.prezzo_31dic(asset, year) or 0
                     saldo += qty * price
 

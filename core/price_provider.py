@@ -3,6 +3,7 @@ import sqlite3
 import ccxt
 import pandas as pd
 from datetime import datetime
+import requests
 
 # === PATH BASE PROGETTO ===
 BASE_DIR = Path(__file__).resolve().parent
@@ -19,14 +20,23 @@ SYMBOL_ALIASES = {
 class PriceProvider:
 
     def __init__(self):
-        self.cex_priority = ['binance', 'kraken', 'bitstamp', 'bitmex', 'bitfinex']
-        self._exchange_instances = {}
-        self._exchange_markets = {}
-        self.last_trade_price = {}
         
         self.conn = sqlite3.connect(DB_PATH)
         self.conn.execute('PRAGMA journal_mode=WAL')
         self.init_db()
+        
+        self.cex_priority = ['binance', 'kraken', 'bitstamp', 'bitmex', 'bitfinex']
+        self._exchange_instances = {}
+        self._exchange_markets = {}
+        self.trade_price_history = {}
+        self.exclude_from_trade_history = {
+            "BTC", "ETH", "USDT", "USDC", "EUR"
+        }
+        # aggiungo anche quelli già nel DB
+        self.exclude_from_trade_history.update(
+            self.load_symbols_from_db()
+        )
+        print(self.exclude_from_trade_history)
         
         # sempre in memoria
         self.df_eurusd = self._load_price_file("EURUSD.csv")
@@ -38,35 +48,106 @@ class PriceProvider:
     def register_trade_price(self, base, quote, qty_base, qty_quote, timestamp):
 
         # Provo a ottenere EUR per uno dei due
-        base_eur = self.prezzo(base, timestamp, True) 
         quote_eur = self.prezzo(quote, timestamp, True)
 
-        total_eur = None
+        if quote_eur:
+            total_eur = quote_eur * qty_quote
+            price_base = total_eur / qty_base
+            self.register_token(base, price_base, timestamp)
+            return  
 
+        base_eur = self.prezzo(base, timestamp, True)
+        
         if base_eur:
             total_eur = base_eur * qty_base
-        elif quote_eur:
-            total_eur = quote_eur * qty_quote
-        else:
-            return  # non posso determinare valore
-
-        # Calcolo prezzi impliciti
-        price_base = total_eur / qty_base
-        price_quote = total_eur / qty_quote
-
-        # Registro entrambi
-        self.last_trade_price[base] = {
-            "price_eur": price_base,
-            "timestamp": timestamp,
-            "source": "trade_fallback"
-        }
-
-        self.last_trade_price[quote] = {
-            "price_eur": price_quote,
-            "timestamp": timestamp,
-            "source": "trade_fallback"
-        }
+            price_quote = total_eur / qty_quote
+            self.register_token(quote, price_quote, timestamp)
         
+    def register_token(self, token, price_eur, timestamp):
+        
+        token = token.upper()
+
+        # 🚫 Se è nella lista esclusione → non memorizzo
+        if token in self.exclude_from_trade_history:
+            return
+        
+        if token not in self.trade_price_history:
+            self.trade_price_history[token] = []
+
+        self.trade_price_history[token].append({
+            "timestamp": timestamp,
+            "price_eur": price_eur
+        })
+        
+    def get_crypto_history_price(self, token, date):
+
+        # normalizzazione data
+        if isinstance(date, int):
+            if date > 1e12:  # millisecondi
+                date = datetime.utcfromtimestamp(date / 1000)
+            else:
+                date = datetime.utcfromtimestamp(date)
+
+        if isinstance(date, datetime):
+            day = date.strftime("%Y-%m-%d")
+        elif isinstance(date, str):
+            day = date
+        else:
+            raise ValueError("Unsupported date format")
+
+        url = f"https://cryptohistory.one/api/{token}/{day}"
+
+        try:
+            resp = requests.get(url, timeout=10)
+            data = resp.json()
+
+            if data.get("found"):
+                if data.get("price_eur") is not None:
+                    return float(data["price_eur"])
+                else:
+                    raise ValueError(f"Token {asset}  trovato su cryptohistory , ma non cambio in EURO ", data)
+
+        except Exception:
+            pass
+
+        return None
+
+    def get_closest_trade_price(self, token, date, max_days=30):
+
+        if token not in self.trade_price_history:
+            return None
+
+        # --- normalizzazione input ---
+        if isinstance(date, int):
+            if date > 1e12:  # millisecondi
+                date = date // 1000
+        else:
+            raise ValueError("date must be unix timestamp int")
+
+        prices = self.trade_price_history[token]
+
+        # Trovo il prezzo con distanza minima
+        best = min(
+            prices,
+            key=lambda p: abs(p["timestamp"] - date)
+        )
+
+        # controllo distanza massima
+        diff_days = abs(best["timestamp"] - date) / 86400
+        
+        print('Recupero prezzo da trade diff_days ',diff_days)
+
+        if diff_days <= max_days:
+            return best["price_eur"]
+
+        return None
+
+    def load_symbols_from_db(self):
+        c = self.conn.cursor()
+        c.execute("SELECT DISTINCT symbol FROM prices")
+        rows = c.fetchall()
+        return {row[0] for row in rows}
+
     def _load_price_file(self, filename):
         path = PRICES_DIR / filename
         df = pd.read_csv(path)
@@ -127,9 +208,6 @@ class PriceProvider:
         if price is not None:
             return price
 
-        print(f"Scarica da CCXT {asset} {timestamp}")
-
-
         pairs_to_try = [
             f"{asset}/EUR",
             f"{asset}/BTC",
@@ -159,7 +237,7 @@ class PriceProvider:
             for pair in pairs_to_try:
                 if pair in symbols:
                     try:
-                        print(f"Trovato {pair} su {ex_id}")
+                        print(f"Trovato {pair} su {ex_id}", datetime.utcfromtimestamp(timestamp))
 
                         raw_price = self.get_price_ccxt(ex_id, pair, timestamp)
                         
@@ -178,15 +256,28 @@ class PriceProvider:
                     except Exception as e:
                         print(f"Errore fetch {pair} su {ex_id}: {e}")
         
-        if asset in self.last_trade_price:
-            TimeLast = datetime.utcfromtimestamp(self.last_trade_price[asset]["timestamp"])
-            PriceLast = self.last_trade_price[asset]["price_eur"]
-            print(f"[ALERT] Using fallback trade price for {asset}  {PriceLast}  {TimeLast} -> {datetime.utcfromtimestamp(timestamp)}")
-            return PriceLast
-                        
+        #  cryptohistory.one provo a prendere prezzo giornaliero per crypto sconosciute del 2017 
+            
+        timestamp = self.normalize_day(timestamp)
+        price = self._get_price_db(asset, timestamp)
+        if price is not None:
+            #print(f"[INFO] Price from DB giorno .cryptohistory.one for {asset} on {datetime.utcfromtimestamp(timestamp)} = {price}")
+            return price
+        
+        price = self.get_crypto_history_price(asset, timestamp)
+        if price:
+            print(f"[INFO] Price Daily from cryptohistory.one for {asset} on {datetime.utcfromtimestamp(timestamp)} = {price}")
+            self._save_price_db(asset, timestamp, price)
+            return price            
+        
         if allow_missing:
-            print(f"[WARNING] Missing price for {asset} on {datetime.utcfromtimestamp(timestamp)}")
             return None 
+        
+        price = self.get_closest_trade_price(asset, timestamp)
+        if price:
+            print(f"[ALERT] Price recuperato da past trade for {asset} on {datetime.utcfromtimestamp(timestamp)} = {price} ")
+            return price  
+        
 
         raise ValueError(f"Impossibile recuperare prezzo per {asset}")
         
@@ -213,22 +304,23 @@ class PriceProvider:
     # =========================
     def _get_price_db(self, asset, timestamp):
                 
+        timestamp = self.normalize_hour(timestamp)
+        
         asset = asset.upper()
         c = self.conn.cursor()
 
         # prende ultimo prezzo disponibile <= timestamp
         c.execute("""
             SELECT price FROM prices
-            WHERE symbol=?
-            AND timestamp <= ?
-            ORDER BY timestamp DESC
-            LIMIT 1
+            WHERE symbol=? AND timestamp=?
         """, (asset, timestamp))
 
         row = c.fetchone()
         return row[0] if row else None
 
     def _save_price_db(self, asset, timestamp, price):
+        
+        timestamp = self.normalize_hour(timestamp)
 
         c = self.conn.cursor()
         c.execute("""
@@ -249,6 +341,34 @@ class PriceProvider:
     
     def isTax(self, asset):
         return asset.upper() in ('EUR','USD', 'USDT', 'USDC', 'DAI', 'MXN')
+    
+    def normalize_hour(self, ts):
+        """
+        Rimuove minuti e secondi.
+        Mantiene anno-mese-giorno-ora.
+        Ritorna timestamp unix (secondi).
+        """
+        if ts > 1e12:  # millisecondi
+            ts = ts / 1000
+
+        dt = datetime.utcfromtimestamp(ts)
+        dt = dt.replace(minute=0, second=0, microsecond=0)
+        
+        return int(dt.timestamp())
+    
+    
+    def normalize_day(self, ts):
+            
+        """
+        Rimuove ore, minuti e secondi.
+        Ritorna inizio giorno UTC.
+        """
+        if ts > 1e12:  # millisecondi
+            ts = ts / 1000
+
+        dt = datetime.utcfromtimestamp(ts)
+        dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        return int(dt.timestamp())
     
     # =========================
     # CCXT

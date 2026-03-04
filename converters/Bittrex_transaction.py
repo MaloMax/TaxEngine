@@ -32,7 +32,7 @@ df = df.sort_values("timestamp").reset_index(drop=True)
 print(datetime.utcfromtimestamp(df["timestamp"].min()))
 print(datetime.utcfromtimestamp(df["timestamp"].max()))
 
-#Date	Currency	Type	Address	Memo/Tag	TxId	Amount
+#Date	Currency	Type	Address	Memo/Tag	TxId	Amount  Commission
 
 
 for idx, row in df.iterrows():
@@ -43,7 +43,7 @@ for idx, row in df.iterrows():
         'type': row.Type,
         'asset': row.Currency,
         'qty': con_lib.to_float(row.Amount),
-        'fee': 0.0,
+        'fee': con_lib.to_float(row.Commission),
         'asset_b': '',
         'qty_b': 0,
         'fee_b': 0,
