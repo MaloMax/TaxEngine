@@ -32,18 +32,37 @@ df = df.sort_values("timestamp").reset_index(drop=True)
 print(datetime.utcfromtimestamp(df["timestamp"].min()))
 print(datetime.utcfromtimestamp(df["timestamp"].max()))
 
+# Dopo riga 33, aggiungi:
+print("\n=== TRANSAZIONI BITTREX ===")
+print(df[['Date', 'Currency', 'Type', 'Amount', 'Commission']].to_string())
+print(f"\nSaldo finale calcolato (qtà - fee):")
+for curr in df['Currency'].unique():
+    curr_df = df[df['Currency'] == curr]
+    total_qty = curr_df['Amount'].astype(float).sum()
+    total_fee = curr_df['Commission'].astype(float).sum()
+    net = total_qty - total_fee
+    print(f"  {curr}: {total_qty} - {total_fee} = {net}")
+    
+    
 #Date	Currency	Type	Address	Memo/Tag	TxId	Amount  Commission
 
-
 for idx, row in df.iterrows():
-
-
+    qty_amount = con_lib.to_float(row.Amount)
+    fee_amount = con_lib.to_float(row.Commission) if pd.notna(row.Commission) else 0.0
+    
+    # Se c'è una commissione e il Type è Withdrawal/Transfer,
+    # la fee è già detratta da Amount
+    if row.Type in ['Withdrawal', 'Transfer'] and fee_amount > 0:
+        net_qty = qty_amount  # già netta
+    else:
+        net_qty = qty_amount - fee_amount
+    
     event = {
         'timestamp': row.timestamp,
         'type': row.Type,
         'asset': row.Currency,
-        'qty': con_lib.to_float(row.Amount),
-        'fee': con_lib.to_float(row.Commission),
+        'qty': net_qty,  # CORRETTO
+        'fee': fee_amount,
         'asset_b': '',
         'qty_b': 0,
         'fee_b': 0,

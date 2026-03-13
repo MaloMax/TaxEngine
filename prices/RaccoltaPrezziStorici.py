@@ -13,7 +13,7 @@ print(symbols)
 
 
 symbol = 'BTC/EUR'
-timeframe = '1h'
+timeframe = '15m'
 
 since = exchange.parse8601('2017-01-01T00:00:00Z')
 all_data = []
@@ -34,8 +34,9 @@ df['price'] = (df['open'] + df['high'] + df['low'] + df['close']) / 4
 df['timestamp'] = df['timestamp'] // 1000  # ms → sec
 df[['timestamp','price']].to_csv("BTCEUR.csv", index=False)
 
+
 symbol = 'EUR/USD'
-timeframe = '1h'
+timeframe = '15m'
 
 since = exchange.parse8601('2017-01-01T00:00:00Z')
 all_data = []
