@@ -263,6 +263,11 @@ class CryptoTaxEngine:
             qty_in = qty - fee
             self.balances[asset] += qty_in
             
+            if abs(qty_in) < 1e-10:
+                return {      'balanceB': 0,  'plus': 0, 'diversi': 0   }
+            
+            
+            
             if pd.notna(asset_b) and str(asset_b).strip():
                 price_as = self.tax_lib.price_lib.prezzo(asset_b, ts)
                 val_eur = price_as * qty_b
@@ -314,7 +319,8 @@ class CryptoTaxEngine:
         # ========================================================
 
         elif typ.upper() == 'DEPOSIT':
-                        
+            
+            print(event)
             qty = qty if qty else qty_b    # in caso di euro a volte e' in qty_b
             qty_in = abs(qty) - fee
 
@@ -334,13 +340,26 @@ class CryptoTaxEngine:
 
             self.diversi_minus[year] += fee * self.tax_lib.price_lib.prezzo(asset, ts)
             self.balances[asset] += qty_in
+            
+            
+
+        # ========================================================
+        # NOTAX (NON IMPONIBILE)
+        # ========================================================
+        # Spostamenti tra  wallet interni al cex
+        # ========================================================
+        
+        elif typ.upper().startswith('NO_TAX'):
+            
+            bol = True
+            #print(event)
 
         else:
             print(event)
             raise ValueError(f"Tipo evento non gestito: {typ}")
 
         return {
-            'balanceB': self.balances['BTC'],
+            'balance': self.balances[asset],
             'plus': plus,
             'diversi': diversi
         }
@@ -390,6 +409,7 @@ class CryptoTaxEngine:
             # Valorizzazione 31 dicembre
             for asset, qty in bals.items():
                 if round(qty, 10) > 0 and asset != 'EUR':
+                    print(f"asset {asset}  qty {qty} ")
                     price = self.tax_lib.prezzo_31dic(asset, year) or 0
                     saldo += qty * price
 

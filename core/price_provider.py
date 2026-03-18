@@ -25,7 +25,7 @@ class PriceProvider:
         self.conn.execute('PRAGMA journal_mode=WAL')
         self.init_db()
         
-        self.cex_priority = ['binance', 'kraken', 'bitstamp', 'bitmex', 'bitfinex']
+        self.cex_priority = ['bybit','binance', 'kraken', 'bitstamp', 'bitfinex']
         self._exchange_instances = {}
         self._exchange_markets = {}
         self.trade_price_history = {}
@@ -36,7 +36,6 @@ class PriceProvider:
         self.exclude_from_trade_history.update(
             self.load_symbols_from_db()
         )
-        print(self.exclude_from_trade_history)
         
         # sempre in memoria
         self.df_eurusd = self._load_price_file("EURUSD.csv")
@@ -115,6 +114,7 @@ class PriceProvider:
     def get_closest_trade_price(self, token, date, max_days=30):
 
         if token not in self.trade_price_history:
+            print(f"asset {token}  not in self.trade_price_history ")
             return None
 
         # --- normalizzazione input ---
@@ -207,6 +207,7 @@ class PriceProvider:
         price = self._get_price_db(asset, timestamp)
         if price is not None:
             return price
+        
 
         pairs_to_try = [
             f"{asset}/EUR",
@@ -256,7 +257,6 @@ class PriceProvider:
                     except Exception as e:
                         print(f"Errore fetch {pair} su {ex_id}: {e}")
         
-        #  cryptohistory.one provo a prendere prezzo giornaliero per crypto sconosciute del 2017 
             
         timestamp = self.normalize_day(timestamp)
         price = self._get_price_db(asset, timestamp)
@@ -279,7 +279,7 @@ class PriceProvider:
             return price  
         
 
-        raise ValueError(f"Impossibile recuperare prezzo per {asset}")
+        raise ValueError(f"Impossibile recuperare prezzo per {asset} {datetime.utcfromtimestamp(timestamp)}   ")
         
     def _get_exchange(self, ex_id):
         if ex_id in self._exchange_instances:

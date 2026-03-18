@@ -160,17 +160,13 @@ class CronverterLib:
             "events": Events_dir
         }
     
+            
     def append_event_to_csv(self, filename, row_dict):
         """
         Appende una riga ad un CSV nella cartella Result.
         Se il file non esiste, crea il file e scrive l'intestazione.
         """
-        
-        headers = [
-            'timestamp', 'type', 'asset', 'qty',
-            'fee', 'asset_b', 'qty_b', 'fee_b',
-            'address', 'Exchange', 'idx', 'File'
-        ]
+        headers = list(row_dict.keys())
 
         file_exists = os.path.isfile(filename)
 
@@ -182,6 +178,7 @@ class CronverterLib:
 
             writer.writerow(row_dict)
 
+            
     def reset_result_file(self,filename):
 
         if os.path.exists(filename):

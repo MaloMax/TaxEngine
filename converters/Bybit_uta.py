@@ -32,7 +32,7 @@ df = pd.concat(dfs, ignore_index=True)
 
 # Rinomina colonne per comodità
 df.columns = df.columns.str.strip()
-df = df.rename(columns={"Time(UTC)": "Time", "Fee Paid": "FeePaid", "Cash Flow": "CashFlow"})
+df = df.rename(columns={"Time(UTC)": "Time", "Fee Paid": "FeePaid", "Cash Flow": "CashFlow", "Wallet Balance": "Balance"})
 
 
 df["timestamp"] = df["Time"].apply(con_lib.to_timestamp)
@@ -71,28 +71,9 @@ while idx < len(df):
     
     # ── TRADE FUTURES CLOSE: realisedpnl ───────────────────────────────────
         if action == "CLOSE" or action == "OPEN":
-            if cashflow != 0:
-                event = {
-                    'timestamp': ts,
-                    'type': 'realisedpnl',
-                    'asset': currency,
-                    'qty': cashflow,
-                    'fee': abs(fee),
-                    'asset_b': '',
-                    'qty_b': 0.0,
-                    'fee_b': 0.0,
-                    'address': ''
-                }
-        else:
-            print(f"TRADE no CLOSE OPEN _line={row['_line']} Type={typ} action={action} CashFlow={cashflow} File={NomeRepFile} idx={row._line}")
-            
-
-    # ── INTEREST ────────────────────────────────────────────────────────────
-    elif typ == "INTEREST" or typ == "SETTLEMENT" or typ == "DELIVERY" or typ == "FEE_REFUND" or typ == "LIQUIDATION" or typ == "BONUS": 
-        if cashflow != 0:
             event = {
                 'timestamp': ts,
-                'type': 'funding',
+                'type': 'realisedpnl',
                 'asset': currency,
                 'qty': cashflow,
                 'fee': abs(fee),
@@ -101,6 +82,24 @@ while idx < len(df):
                 'fee_b': 0.0,
                 'address': ''
             }
+        else:
+            print(f"TRADE no CLOSE OPEN _line={row['_line']} Type={typ} action={action} CashFlow={cashflow} File={NomeRepFile} idx={row._line}")
+            
+
+    # ── INTEREST ────────────────────────────────────────────────────────────
+    elif typ == "INTEREST" or typ == "SETTLEMENT" or typ == "DELIVERY" or typ == "FEE_REFUND" or typ == "LIQUIDATION" or typ == "BONUS": 
+        
+        event = {
+            'timestamp': ts,
+            'type': 'funding',
+            'asset': currency,
+            'qty': cashflow,
+            'fee': abs(fee),
+            'asset_b': '',
+            'qty_b': 0.0,
+            'fee_b': 0.0,
+            'address': ''
+        }
             
     # ── TRANSFER_OUT_IN:  ──────────────────────────────────────────────
     elif typ.startswith("TRANSFER")  :
@@ -125,9 +124,7 @@ while idx < len(df):
         
         cashArr[currency] = cashflow
         feeArr[currency] = fee
-            
-        idxOld = idx
-        
+                
         while idx < len(df):
             idx += 1
             row = df.iloc[idx]
@@ -140,114 +137,79 @@ while idx < len(df):
             feeN = to_float(row.get("FeePaid", 0))
             tsN = row.timestamp
             
-            if ts != tsN:
+            if ts != tsN or contract != contractN:
                 idx -= 1
                 break
                 
             cashArr[currencyN] = cashArr.get(currencyN, 0) + cashflowN
             feeArr[currencyN] = feeArr.get(currencyN, 0) + feeN
-            
-            if len(cashArr) == 1 : #    Trasferimento tra wallet del cex
-                
-                event = {
-                    'timestamp': ts,
-                    'type': 'no_tax_NoDettagli',
-                    'asset': currency,
-                    'qty': cashflow,
-                    'fee': abs(fee),
-                    'asset_b': '',
-                    'qty_b': 0.0,
-                    'fee_b': 0.0,
-                    'address': ''
-                }  
-                
-                
-            elif len(cashArr) == 2 : #    Scambio spot tra 2 valute su 2 o piu' linee di report
-                
-                # asset_b = stablecoin/fiat, asset = crypto
-                cur1 = list(miocashArrDict)[0]
-                cur2 = list(miocashArrDict)[1]
-                                   
-                if con_lib.isTax(cur1):
-                    asset,   qty,   fee_a = cur2, cashArr[cur2], feeArr[cur2]
-                    asset_b, qty_b, fee_b = cur1, cashArr[cur1], feeArr[cur1]
-                else:
-                    asset,   qty,   fee_a = cur1, cashArr[cur1], feeArr[cur1]
-                    asset_b, qty_b, fee_b = cur2, cashArr[cur2], feeArr[cur2]
 
-                # buy se qty crypto > 0, sell se < 0
-                trade_type = 'buy' if qty > 0 else 'sell'
+        if len(cashArr) == 1 : #    Trasferimento tra wallet del cex
 
-                event = {
-                    'timestamp': ts,
-                    'type': trade_type,
-                    'asset': asset,
-                    'qty': qty,
-                    'fee': fee_a,
-                    'asset_b': asset_b,
-                    'qty_b': qty_b,
-                    'fee_b': fee_b,
-                    'address': ''
-                }
-            
-            else : #    Scambio tra molte valute. probabile conversione piccoli importi.
-            
-            #print(f" _line={row['_line']} Type={typN} Currency={currencyN} action={actionN} tsN={tsN}") 
-            
-             
-        print('TRADE SPOT:'+str(int(idx-idxOld+1)) + str(len(cashArr))  ) 
-        if idx-idxOld+1 >9:
-            print(f"  _line={row['_line']} Type={typ} Currency={currency} action={action} File={NomeRepFile} idx={row._line}")
-            
-        ''' 
+            event = {
+                'timestamp': ts,
+                'type': 'no_tax_NoDettagli',
+                'asset': currency,
+                'qty': cashflow,
+                'fee': abs(fee),
+                'asset_b': '',
+                'qty_b': 0.0,
+                'fee_b': 0.0,
+                'address': ''
+            }  
 
-        idx2 = idx + 1
-        if idx2 < len(df):
-            row2 = df.iloc[idx2]
-            if row2.timestamp == ts:
 
-                cur1 = str(row.get("Currency", "")).strip()
-                cur2 = str(row2.get("Currency", "")).strip()
-                cf1 = to_float(row.get("CashFlow", 0))
-                cf2 = to_float(row2.get("CashFlow", 0))
-                fee1 = abs(to_float(row.get("FeePaid", 0)))
-                fee2 = abs(to_float(row2.get("FeePaid", 0)))
+        elif len(cashArr) == 2 : #    Scambio spot tra 2 valute su 2 o piu' linee di report
 
-                # asset_b = stablecoin/fiat, asset = crypto
-                if con_lib.isTax(cur1):
-                    asset_b, qty_b, fee_b = cur1, cf1, fee1
-                    asset,   qty,   fee_a = cur2, cf2, fee2
-                else:
-                    asset,   qty,   fee_a = cur1, cf1, fee1
-                    asset_b, qty_b, fee_b = cur2, cf2, fee2
+            # asset_b = stablecoin/fiat, asset = crypto
+            cur1 = list(cashArr)[0]
+            cur2 = list(cashArr)[1]
 
-                # buy se qty crypto > 0, sell se < 0
-                trade_type = 'buy' if qty > 0 else 'sell'
-
-                event = {
-                    'timestamp': ts,
-                    'type': trade_type,
-                    'asset': asset,
-                    'qty': qty,
-                    'fee': fee_a,
-                    'asset_b': asset_b,
-                    'qty_b': qty_b,
-                    'fee_b': fee_b,
-                    'address': ''
-                }
-                idx += 2
+            if con_lib.isTax(cur1):
+                asset,   qty,   fee_a = cur2, cashArr[cur2], feeArr[cur2]
+                asset_b, qty_b, fee_b = cur1, cashArr[cur1], feeArr[cur1]
             else:
-                idx += 1
-        else:
-            idx += 1
-        '''
+                asset,   qty,   fee_a = cur1, cashArr[cur1], feeArr[cur1]
+                asset_b, qty_b, fee_b = cur2, cashArr[cur2], feeArr[cur2]
+
+            # buy se qty crypto > 0, sell se < 0
+            trade_type = 'buy' if qty > 0 else 'sell'
+
+            event = {
+                'timestamp': ts,
+                'type': trade_type,
+                'asset': asset,
+                'qty': qty,
+                'fee': fee_a,
+                'asset_b': asset_b,
+                'qty_b': qty_b,
+                'fee_b': fee_b,
+                'address': ''
+            }
+
+        else : #    Scambio tra molte valute. probabile conversione piccoli importi. tratto come diversi ( piccoli importi 
+
+            for cur, cf in cashArr.items():
+                
+                ev = {
+                    'timestamp': ts,
+                    'type': 'funding',
+                    'asset': cur,
+                    'qty': cf,
+                    'fee': abs(feeArr[cur]),
+                    'asset_b': '', 'qty_b': 0.0, 'fee_b': 0.0, 'address': ''
+                }
+                balanceN = to_float(row.get("Balance", 0))
+                con_lib.append_event_to_csv(EventsFile, {**ev, 'Exchange': CexName, 'idx': idx, 'File': NomeRepFile, 'Balance': balanceN, 'Uid': row.Uid})
+            # e lascia event = None per non riscriverlo dopo
 
     else:
         print(f"TRADE UNKNOWN _line={row['_line']} Type={typ} Currency={currency} action={action} File={NomeRepFile} idx={row._line}")
 
 
     if event:
-        con_lib.append_event_to_csv(EventsFile, {**event, 'Exchange': CexName, 'idx': idx, 'File': NomeRepFile})
+        balance = to_float(row.get("Balance", 0))
+        con_lib.append_event_to_csv(EventsFile, {**event, 'Exchange': CexName, 'idx': row._line, 'File': NomeRepFile, 'Balance': balance, 'Uid': row.Uid})
 
     idx += 1
 
