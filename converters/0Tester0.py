@@ -62,29 +62,12 @@ for idx, row in df.iterrows():
     result = engine.process_event(event)
     
     
-    file_key = row._event_file
-    if file_key not in last_balance:
-        last_balance[file_key] = {}
-    if pd.notna(row.Balance) and not pd.isna(row.Balance) and str(row.Balance).strip() != '':
-        last_balance[file_key][row.asset] = row.Balance
-    
-    
-
-    # Somma balance CEX per asset
-    cex_balance = {}
-    for bal in last_balance.values():
-        for asset, val in bal.items():
-            cex_balance[asset] = cex_balance.get(asset, 0) + val
-
             
         
     save_row = {
-        **event,
-        'Uid': row.Uid,
-        'BalanceCex': cex_balance.get(row.asset, 0),
-        **result,
         'idx': idx,
-        'idxF': row.idx,
+        **event,
+        **result,
         'File': row.File
     }
     

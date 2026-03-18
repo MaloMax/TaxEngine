@@ -199,8 +199,7 @@ while idx < len(df):
                     'fee': abs(feeArr[cur]),
                     'asset_b': '', 'qty_b': 0.0, 'fee_b': 0.0, 'address': ''
                 }
-                balanceN = to_float(row.get("Balance", 0))
-                con_lib.append_event_to_csv(EventsFile, {**ev, 'Exchange': CexName, 'idx': idx, 'File': NomeRepFile, 'Balance': balanceN, 'Uid': row.Uid})
+                con_lib.append_event_to_csv(EventsFile, {**ev, 'Exchange': CexName, 'idx': idx, 'File': NomeRepFile})
             # e lascia event = None per non riscriverlo dopo
 
     else:
@@ -208,8 +207,7 @@ while idx < len(df):
 
 
     if event:
-        balance = to_float(row.get("Balance", 0))
-        con_lib.append_event_to_csv(EventsFile, {**event, 'Exchange': CexName, 'idx': row._line, 'File': NomeRepFile, 'Balance': balance, 'Uid': row.Uid})
+        con_lib.append_event_to_csv(EventsFile, {**event, 'Exchange': CexName, 'idx': row._line, 'File': NomeRepFile})
 
     idx += 1
 

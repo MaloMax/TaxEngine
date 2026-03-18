@@ -423,16 +423,7 @@ class CryptoTaxEngine:
                 'exchange': self.exchange
             })
 
-            self.tax_lib.salva_report_fiscale(
-                self.exchange,
-                year,
-                saldo,
-                self.total_plus.get(year, 0),
-                self.total_minus.get(year, 0),
-                self.diversi_plus.get(year, 0),
-                self.diversi_minus.get(year, 0)
-            )
-            
+
         return report
 
 

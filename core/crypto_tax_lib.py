@@ -77,22 +77,6 @@ class CryptoTaxLib:
             UNIQUE(dest_exchange, asset, address_source, data_deposito)
         )
         ''')
-        
-
-            # TAB 4: Report fiscali per exchange/anno
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS report_fiscali (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            exchange TEXT NOT NULL, anno INTEGER NOT NULL,
-            saldo_31dic_eur REAL DEFAULT 0,
-            plusvalenze_eur REAL DEFAULT 0,
-            minusvalenze_eur REAL DEFAULT 0,
-            diversi_plus_eur REAL DEFAULT 0,
-            diversi_minus_eur REAL DEFAULT 0,
-            data_calcolo TEXT DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(exchange, anno)
-        )
-        ''')
 
         conn.commit()
         conn.close()
@@ -158,9 +142,9 @@ class CryptoTaxLib:
             price = PREZZI_STORICI[asset][year]
             return round(price * USD_TO_EUR_31DIC.get(year, 1), 2)
         
-        price_usd = self.price_lib.prezzo(asset, self.to_timestamp(f'{year}-12-31 23:59:00'))
-        if price_usd:
-            return round(price_usd * USD_TO_EUR_31DIC.get(year, 1), 2)
+        price_euro = self.price_lib.prezzo(asset, self.to_timestamp(f'{year}-12-31 23:59:00'))
+        if price_euro:
+            return round(price_euro, 2)
         
 
         raise ValueError(f"Problema a recuperare prezzo 31 12 {year} {asset}")
@@ -339,45 +323,6 @@ class CryptoTaxLib:
         if os.path.exists(filename):
             os.remove(filename)
             
-    def salva_report_fiscale(self, exchange, anno, saldo=0, plus=0, minus=0, redditiP=0, redditiM=0):
-        """Salva/aggiorna report anno-exchange."""
-        conn = sqlite3.connect(self.db_path)
-        try:
-            pd.DataFrame([{
-                'exchange': exchange, 'anno': anno,
-                'saldo_31dic_eur': saldo, 'plusvalenze_eur': plus,
-                'minusvalenze_eur': minus, 'diversi_plus_eur': redditiP, 'diversi_minus_eur': redditiM
-            }]).to_sql('report_fiscali', conn, if_exists='append', index=False)
-            print(f" REPORT {exchange}-{anno}: Saldo {saldo:,.0f}€ | NetPlus {plus-minus:,.2f}€")
-        except sqlite3.IntegrityError:
-            # Update esistente
-            conn.execute('''
-                UPDATE report_fiscali SET saldo_31dic_eur=?, plusvalenze_eur=?, 
-                minusvalenze_eur=?, diversi_plus_eur=?,  diversi_minus_eur=?, data_calcolo=CURRENT_TIMESTAMP
-                WHERE exchange=? AND anno=?
-            ''', (saldo, plus, minus, redditiP, redditiM, exchange, anno))
-            print(f" UPDATE {exchange}-{anno}")
-        conn.commit()
-        conn.close()
-        
-        
-    def report_consolidato(self):
-        """Somma TUTTI exchange per RW/RT."""
-        conn = sqlite3.connect(self.db_path)
-        df = pd.read_sql_query('''
-            SELECT anno, 
-                   SUM(saldo_31dic_eur) saldo_tot,
-                   SUM(plusvalenze_eur) plus_tot,
-                   SUM(minusvalenze_eur) minus_tot,
-                   SUM(diversi_plus_eur) diversi_plus_eur,
-                   SUM(diversi_minus_eur) diversi_minus_eur
-            FROM report_fiscali GROUP BY anno ORDER BY anno
-        ''', conn)
-        print("\n CONSOLIDATO RW/RT:")
-        print(df.to_markdown(index=False))
-        conn.close()
-        return df
-
 
   
 tax_lib = CryptoTaxLib()

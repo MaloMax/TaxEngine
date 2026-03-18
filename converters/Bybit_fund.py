@@ -56,7 +56,6 @@ while idx < len(df):
     ts = row.timestamp
     NomeRepFile = row["_file"]
     event = None
-    balance = to_float(row.get("Balance", 0))
 
 
             
@@ -135,7 +134,7 @@ while idx < len(df):
 
 
     if event:
-        con_lib.append_event_to_csv(EventsFile, {**event, 'Exchange': CexName, 'idx': row._line, 'File': NomeRepFile, 'Balance': balance, 'Uid': row.Uid})
+        con_lib.append_event_to_csv(EventsFile, {**event, 'Exchange': CexName, 'idx': row._line, 'File': NomeRepFile})
 
     idx += 1
 
