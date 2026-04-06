@@ -1,3 +1,12 @@
+"""
+import_onchain.py
+Legge i pickle mempool.space e inserisce nel DB transfers.
+Un record per ogni mio indirizzo coinvolto nella tx:
+  - vin  → withdrawal (address = mio indirizzo che spende)
+  - vout → deposit    (address = mio indirizzo che riceve)
+Fee totale memorizzata sul deposit.
+"""
+
 import os
 import sys
 import sqlite3
@@ -59,78 +68,88 @@ def get_all_txs(address, sleep=0.2):
     return all_txs
 
 
+# ── INIT DB ───────────────────────────────────────────────────────────────────
+
+def init_db(conn):
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS transfers (
+            id          TEXT PRIMARY KEY,
+            type        TEXT NOT NULL,
+            asset       TEXT NOT NULL,
+            qty         REAL NOT NULL,
+            fee         REAL DEFAULT 0,
+            timestamp   INTEGER NOT NULL,
+            exchange    TEXT,
+            txid        TEXT,
+            address     TEXT,
+            linked_id   TEXT,
+            source      TEXT DEFAULT 'cex',
+            status      TEXT DEFAULT 'unmatched',
+            source_file TEXT,
+            source_idx  INTEGER
+        )
+    ''')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_asset_ts ON transfers(asset, timestamp)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_status   ON transfers(status)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_txid     ON transfers(txid)')
+    conn.commit()
+
+
 # ── PARSE TX → RECORDS ───────────────────────────────────────────────────────
 
-def parse_tx(tx, my_address, my_addresses):
+def parse_tx(tx, my_addresses):
     txid = tx["txid"]
     ts   = tx["status"].get("block_time")
     if not ts:
-        print(f"  [SKIP] unconfirmed  txid={txid}  addr={my_address}")
+        print(f"  [SKIP] unconfirmed  txid={txid}")
         return []
 
     fee     = tx.get("fee", 0)
     records = []
-    spending = False
-    from_addr = None
+
+    # withdrawal: ogni mio indirizzo in input
     for vin in tx["vin"]:
-        prev = vin.get("prevout")
-        if not prev:
-            continue
-        if prev.get("scriptpubkey_address") == my_address:
-            spending = True
-        if prev.get("scriptpubkey_address"):
-            from_addr = prev["scriptpubkey_address"]
+        prev = vin.get("prevout") or {}
+        addr = prev.get("scriptpubkey_address")
+        val  = prev.get("value", 0)
+        if addr and addr in my_addresses:
+            records.append({
+                'id':        f"onchain_withdrawal_{txid}_{addr}",
+                'type':      'withdrawal',
+                'asset':     'BTC',
+                'qty':       val / 1e8,
+                'fee':       0.0,
+                'timestamp': ts,
+                'exchange':  None,
+                'txid':      txid,
+                'address':   addr,
+                'linked_id': None,
+                'source':    'onchain',
+                'status':    'unmatched',
+            })
 
-    seen_out_addrs = []
-
+    # deposit: ogni mio indirizzo in output
     for vout in tx["vout"]:
-        to_addr = vout.get("scriptpubkey_address")
-        amount  = vout.get("value", 0)
-
-        if to_addr == my_address:
-            internal = (from_addr in my_addresses) if from_addr else False
+        addr = vout.get("scriptpubkey_address")
+        val  = vout.get("value", 0)
+        if addr and addr in my_addresses:
             records.append({
-                'id':           f"onchain_deposit_{txid}_{my_address}",
-                'type':         'deposit',
-                'asset':        'BTC',
-                'qty':          amount / 1e8,
-                'fee':          0.0,
-                'timestamp':    ts,
-                'exchange':     None,
-                'txid':         txid,
-                'address_from': from_addr,
-                'address_to':   my_address,
-                'linked_id':    None,
-                'source':       'onchain',
-                'status':       'internal' if internal else 'unmatched',
+                'id':        f"onchain_deposit_{txid}_{addr}",
+                'type':      'deposit',
+                'asset':     'BTC',
+                'qty':       val / 1e8,
+                'fee':       fee / 1e8,
+                'timestamp': ts,
+                'exchange':  None,
+                'txid':      txid,
+                'address':   addr,
+                'linked_id': None,
+                'source':    'onchain',
+                'status':    'unmatched',
             })
-
-        elif spending and to_addr and to_addr not in seen_out_addrs:
-            tx_fee = fee if not seen_out_addrs else 0
-            internal = (to_addr in my_addresses)
-            records.append({
-                'id':           f"onchain_withdrawal_{txid}_{to_addr}",
-                'type':         'withdrawal',
-                'asset':        'BTC',
-                'qty':          amount / 1e8,
-                'fee':          tx_fee / 1e8,
-                'timestamp':    ts,
-                'exchange':     None,
-                'txid':         txid,
-                'address_from': my_address,
-                'address_to':   to_addr,
-                'linked_id':    None,
-                'source':       'onchain',
-                'status':       'internal' if internal else 'unmatched',
-            })
-            seen_out_addrs.append(to_addr)
-
-    if not records:
-        print(f"  [SKIP] no_match     txid={txid}  addr={my_address}  "
-              f"spending={spending}  from={from_addr}  "
-              f"vouts={[v.get('scriptpubkey_address') for v in tx['vout']]}")
 
     return records
+
 
 # ── INSERT DB ─────────────────────────────────────────────────────────────────
 
@@ -139,31 +158,16 @@ def insert_record(conn, rec):
         conn.execute('''
             INSERT OR IGNORE INTO transfers
             (id, type, asset, qty, fee, timestamp, exchange, txid,
-             address_from, address_to, linked_id, source, status)
+             address, linked_id, source, status)
             VALUES
             (:id,:type,:asset,:qty,:fee,:timestamp,:exchange,:txid,
-             :address_from,:address_to,:linked_id,:source,:status)
+             :address,:linked_id,:source,:status)
         ''', rec)
-        changes = conn.execute('SELECT changes()').fetchone()[0]
-        if changes == 0:
-            # Recupera il record già presente per confronto
-            existing = conn.execute(
-                'SELECT type, qty, timestamp, status FROM transfers WHERE id=?',
-                (rec['id'],)
-            ).fetchone()
-            import datetime
-            ts_new = datetime.datetime.utcfromtimestamp(rec['timestamp']).strftime('%Y-%m-%d %H:%M')
-            if existing:
-                ts_ex = datetime.datetime.utcfromtimestamp(existing[2]).strftime('%Y-%m-%d %H:%M')
-                print(f"  [DUP]  id={rec['id']}")
-                print(f"         nuovo:     type={rec['type']}  qty={rec['qty']:.8f}  ts={ts_new}  status={rec['status']}")
-                print(f"         esistente: type={existing[0]}  qty={existing[1]:.8f}  ts={ts_ex}  status={existing[3]}")
-            else:
-                print(f"  [DUP?] id={rec['id']}  changes=0 ma record non trovato (race condition?)")
-        return changes
+        return conn.execute('SELECT changes()').fetchone()[0]
     except sqlite3.Error as e:
         print(f"  [ERR]  id={rec['id']}  errore={e}")
         return 0
+
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 
@@ -173,30 +177,23 @@ if __name__ == '__main__':
     print(f"DB: {DB_PATH}\n")
 
     conn = sqlite3.connect(DB_PATH)
+    init_db(conn)
 
-    inserted  = 0
-    duplicate = 0
-    tx_count  = 0
+    inserted = 0
 
     for address in sorted(my_addresses):
         txs = get_all_txs(address)
-        tx_count += len(txs)
+        print(f"{address}: {len(txs)} tx")
 
         for tx in txs:
-            records = parse_tx(tx, address, my_addresses)
+            records = parse_tx(tx, my_addresses)
             for rec in records:
-                n = insert_record(conn, rec)
-                if n:
-                    inserted += 1
-                else:
-                    duplicate += 1
+                inserted += insert_record(conn, rec)
 
     conn.commit()
 
-    # Riepilogo onchain nel DB
     cur = conn.execute("SELECT status, COUNT(*) FROM transfers WHERE source='onchain' GROUP BY status")
-    print(f"\nTx elaborate: {tx_count}")
-    print(f"Inseriti: {inserted}  |  Duplicati/già presenti: {duplicate}")
+    print(f"\nInseriti nel DB: {inserted}")
     print("\nStatistiche onchain nel DB:")
     for row in cur.fetchall():
         print(f"  {row[0]:12s}: {row[1]}")

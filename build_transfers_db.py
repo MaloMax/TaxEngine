@@ -1,7 +1,7 @@
 """
 build_transfers_db.py
 Legge tutti i file *_event.csv dalla cartella Events,
-estrae solo deposit e withdrawal, e popola il DB transfers.sqlite
+estrae solo deposit e withdrawal, e popola il DB transfers.db
 """
 
 import os
@@ -15,31 +15,31 @@ DB_PATH    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Data", "t
 
 TYPES_WITHDRAWAL = {'withdrawal', 'withdraw'}
 TYPES_DEPOSIT    = {'deposit'}
-SKIP_ASSETS      = {'EUR'}
+SKIP_ASSETS      = {'EUR', 'MXN'}
 
 
 def init_db(conn):
     conn.execute('''
         CREATE TABLE IF NOT EXISTS transfers (
-            id           TEXT PRIMARY KEY,
-            type         TEXT NOT NULL,
-            asset        TEXT NOT NULL,
-            qty          REAL NOT NULL,
-            fee          REAL DEFAULT 0,
-            timestamp    INTEGER NOT NULL,
-            exchange     TEXT,
-            txid         TEXT,
-            address_from TEXT,
-            address_to   TEXT,
-            linked_id    TEXT,
-            source       TEXT DEFAULT 'cex',
-            status       TEXT DEFAULT 'unmatched',
-            source_file  TEXT,
-            source_idx   INTEGER
+            id          TEXT PRIMARY KEY,
+            type        TEXT NOT NULL,
+            asset       TEXT NOT NULL,
+            qty         REAL NOT NULL,
+            fee         REAL DEFAULT 0,
+            timestamp   INTEGER NOT NULL,
+            exchange    TEXT,
+            txid        TEXT,
+            address     TEXT,
+            linked_id   TEXT,
+            source      TEXT DEFAULT 'cex',
+            status      TEXT DEFAULT 'unmatched',
+            source_file TEXT,
+            source_idx  INTEGER
         )
     ''')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_asset_ts ON transfers(asset, timestamp)')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_status   ON transfers(status)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_txid     ON transfers(txid)')
     conn.commit()
 
 
@@ -90,7 +90,6 @@ def to_float(val):
 
 
 def build_record(row):
-    """Ritorna (record_dict, None) oppure (None, motivo_scarto)."""
     typ      = row['type'].strip().lower()
     typ_norm = 'withdrawal' if typ in TYPES_WITHDRAWAL else 'deposit'
 
@@ -105,24 +104,23 @@ def build_record(row):
         qty = to_float(row.get('qty_b', 0))
 
     address = str(row.get('address', '') or '').strip()
-    address = '' if address in ('-', 'nan', 'None', '') else address
+    address = None if address in ('-', 'nan', 'None', '') else address
 
     return {
-        'id':           make_id(row, typ_norm),
-        'type':         typ_norm,
-        'asset':        asset,
-        'qty':          abs(qty),
-        'fee':          abs(to_float(row.get('fee', 0))),
-        'timestamp':    int(to_float(row.get('timestamp', 0))),
-        'exchange':     str(row.get('Exchange', '')),
-        'txid':         None,
-        'address_from': address if typ_norm == 'withdrawal' else None,
-        'address_to':   address if typ_norm == 'deposit'    else None,
-        'linked_id':    None,
-        'source':       'cex',
-        'status':       'unmatched',
-        'source_file':  row.get('source_file', ''),
-        'source_idx':   int(row.get('source_idx', 0)),
+        'id':          make_id(row, typ_norm),
+        'type':        typ_norm,
+        'asset':       asset,
+        'qty':         abs(qty),
+        'fee':         abs(to_float(row.get('fee', 0))),
+        'timestamp':   int(to_float(row.get('timestamp', 0))),
+        'exchange':    str(row.get('Exchange', '')),
+        'txid':        None,
+        'address':     address,
+        'linked_id':   None,
+        'source':      'cex',
+        'status':      'unmatched',
+        'source_file': row.get('source_file', ''),
+        'source_idx':  int(row.get('source_idx', 0)),
     }, None
 
 
@@ -141,12 +139,10 @@ def populate_db(conn, df):
             conn.execute('''
                 INSERT OR IGNORE INTO transfers
                 (id, type, asset, qty, fee, timestamp, exchange, txid,
-                 address_from, address_to, linked_id, source, status,
-                 source_file, source_idx)
+                 address, linked_id, source, status, source_file, source_idx)
                 VALUES
                 (:id,:type,:asset,:qty,:fee,:timestamp,:exchange,:txid,
-                 :address_from,:address_to,:linked_id,:source,:status,
-                 :source_file,:source_idx)
+                 :address,:linked_id,:source,:status,:source_file,:source_idx)
             ''', rec)
             inserted += conn.execute('SELECT changes()').fetchone()[0]
         except sqlite3.Error as e:
@@ -162,21 +158,6 @@ def populate_db(conn, df):
             print(f"    {count:3d}x  {reason}")
 
     return inserted, skipped
-
-
-def export_csv(conn, out_path):
-    df = pd.read_sql_query('''
-        SELECT id, type, asset, qty, fee,
-               datetime(timestamp, 'unixepoch') as datetime_utc,
-               timestamp, exchange, txid,
-               address_from, address_to,
-               linked_id, source, status,
-               source_file, source_idx
-        FROM transfers
-        ORDER BY timestamp ASC
-    ''', conn)
-    df.to_csv(out_path, index=False)
-    print(f"\nCSV esportato: {out_path}  ({len(df)} righe)")
 
 
 if __name__ == '__main__':
@@ -196,6 +177,4 @@ if __name__ == '__main__':
         ins, skip = populate_db(conn, df)
         print(f"Inseriti: {ins}  |  Saltati: {skip}")
 
-    csv_out = DB_PATH.replace('.db', '_export.csv')
-    export_csv(conn, csv_out)
     conn.close()

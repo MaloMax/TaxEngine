@@ -4,11 +4,11 @@ I prezzi storici BTC/EUR sono acquisiti tramite API pubbliche dell’exchange Bi
 
 2. Risoluzione temporale
 
-Viene utilizzata risoluzione oraria (H1) per l’intero periodo storico.
+Viene utilizzata risoluzione 15 minuti (15m) per l’intero periodo storico.
 
 3. Determinazione del prezzo
 
-Per ogni intervallo orario il prezzo è calcolato come media aritmetica della candela:
+Per ogni intervallo il prezzo è calcolato come media aritmetica della candela:
 
 price = (open + high + low + close) / 4
 4. Selezione del prezzo per evento
