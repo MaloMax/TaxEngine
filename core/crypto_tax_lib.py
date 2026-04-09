@@ -7,7 +7,7 @@ import numbers
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATABASE_DIR = os.path.join(BASE_DIR, "Data", "DataBase")
+DATABASE_DIR = os.path.join(BASE_DIR, "Data")
 DB_PATH = os.path.join(DATABASE_DIR, "crypto_tax.db")
 
 from price_provider import PriceProvider
@@ -297,6 +297,7 @@ class CryptoTaxLib:
 
         return {
             "report": Cex_dir,
+            "data": data_dir,
             "events": Events_dir
         } 
         

@@ -71,7 +71,8 @@ for idx, row in df.iterrows():
         'File': row.File
     }
     
-    tax_lib.append_event_to_csv(CexName+'_debug.csv', save_row)
+    file_path = os.path.join(paths["data"], CexName + '_debug.csv')
+    tax_lib.append_event_to_csv(file_path, save_row)
 
 print(last_balance)
     
@@ -84,7 +85,6 @@ df_finale = pd.DataFrame(report)
 print("\n### TABELLA RIASSUNTO ###")
 print(df_finale.to_markdown(index=False))
 
-df_finale.to_csv(CexName+'_test.csv', index=False)
 
 tax_lib.report_status()
    
