@@ -1,81 +1,94 @@
-üìÑ Metodologia di determinazione delle plusvalenze su cripto-attivit√†
-1. Riferimenti normativi
+# Metodologia di determinazione delle plusvalenze su cripto-attivit‡
 
-Le plusvalenze derivanti da cessione di cripto-attivit√† sono state determinate ai sensi dell‚Äôart. 67 e dell‚Äôart. 68 del TUIR (D.P.R. 917/1986), come modificato dalla Legge n. 197/2022.
+---
 
-Il criterio di determinazione della plusvalenza applicato √®:
+## 1. Riferimenti normativi
 
-Corrispettivo percepito ‚Äì Costo fiscalmente riconosciuto
+Le plusvalenze derivanti da cessione di cripto-attivit‡ sono determinate ai sensi degli artt. 67 e 68 del TUIR (D.P.R. 917/1986), come modificato dalla Legge n. 197/2022.
 
-2. Metodo di valorizzazione delle quantit√† cedute
+**Formula utilizzata:**
 
-Per la determinazione del costo fiscalmente riconosciuto √® stato adottato il metodo:
+Corrispettivo percepito ñ Costo fiscalmente riconosciuto
 
-FIFO (First In, First Out)
+---
 
-Le quantit√† cedute sono imputate alle prime quantit√† acquistate cronologicamente.
+## 2. Metodo di valorizzazione
 
-Il metodo √® applicato in modo continuo e coerente per tutta la serie storica delle operazioni.
+Per la determinazione del costo fiscalmente riconosciuto Ë adottato il metodo:
 
-3. Trattamento delle commissioni (fee)
-3.1 Commissioni in valuta fiat
+**FIFO (First In, First Out)**
+
+Le quantit‡ cedute sono imputate alle prime quantit‡ acquistate cronologicamente.
+
+Il metodo Ë applicato in modo **continuo e coerente** su tutta la serie storica.
+
+---
+
+## 3. Commissioni (fee)
+
+### 3.1 Commissioni in valuta fiat
 
 Le commissioni pagate in euro:
 
-Aumentano il costo di acquisto nel caso di operazioni di acquisto;
+- **Aumentano il costo di acquisto** (in caso di acquisto)  
+- **Riducono il corrispettivo** (in caso di vendita)
 
-Riducono il corrispettivo nel caso di operazioni di vendita.
+In conformit‡ allíart. 68 TUIR (oneri accessori).
 
-In conformit√† all‚Äôart. 68 TUIR, che include tra gli oneri accessori i costi direttamente imputabili alla transazione.
+---
 
-3.2 Commissioni pagate in cripto-attivit√†
+### 3.2 Commissioni in cripto-attivit‡
 
-Le commissioni pagate nella stessa cripto-attivit√† oggetto di cessione:
+Le commissioni pagate nella stessa cripto:
 
-Incrementano la quantit√† fiscalmente ceduta;
+- **Incrementano la quantit‡ fiscalmente ceduta**  
+- Sono incluse nel calcolo del costo storico (FIFO)
 
-Vengono pertanto considerate nel calcolo del costo storico mediante applicazione del metodo FIFO.
+In caso di acquisto:
 
-In caso di acquisto, riducono la quantit√† netta effettivamente detenuta.
+- **Riducono la quantit‡ netta detenuta**
 
-4. Operazioni cripto/cripto
+---
 
-Le operazioni di scambio tra cripto-attivit√†:
+## 4. Operazioni cripto/cripto
 
-Non determinano realizzo fiscalmente rilevante in assenza di conversione in euro;
+Le operazioni tra cripto-attivit‡:
 
-Trasferiscono il costo storico della cripto ceduta alla cripto ricevuta.
+- **Non generano realizzo fiscale** (se non convertite in euro)  
+- **Trasferiscono il costo storico** alla cripto ricevuta  
 
-Il costo di carico della cripto ricevuta √® determinato sulla base del costo storico della quantit√† ceduta.
+Il costo della nuova cripto deriva dal costo storico di quella ceduta.
 
-5. Determinazione della plusvalenza
+---
+
+## 5. Determinazione della plusvalenza
 
 In caso di conversione in euro:
 
-Plusvalenza = Corrispettivo netto ‚Äì Costo storico della quantit√† ceduta
+**Plusvalenza = Corrispettivo netto ñ Costo storico**
 
 Dove:
 
-Corrispettivo netto = importo percepito al netto delle commissioni
+- **Corrispettivo netto** = importo al netto delle commissioni  
+- **Costo storico** = determinato con metodo FIFO  
 
-Costo storico = costo determinato con metodo FIFO
+---
 
-6. Conversioni valutarie
+## 6. Conversioni valutarie
 
-Per operazioni espresse in valuta diversa dall‚Äôeuro, il controvalore √® stato determinato:
+Per operazioni in valuta diversa dallíeuro:
 
-Utilizzando il tasso di cambio EUR/USD del giorno dell‚Äôoperazione;
+- Si utilizza il **tasso EUR/USD del giorno**  
+- Applicato al controvalore della transazione  
 
-Applicando tale cambio al controvalore della transazione.
+La fonte dei dati Ë **documentata e riproducibile**.
 
-La fonte dati dei tassi di cambio √® documentata e riproducibile.
+---
 
-7. Riproducibilit√† del calcolo
+## 7. Riproducibilit‡ del calcolo
 
-Le elaborazioni sono state effettuate tramite procedura automatizzata che:
+Le elaborazioni sono effettuate tramite procedura automatizzata che:
 
-Ricostruisce integralmente la cronologia delle operazioni;
-
-Mantiene traccia del costo storico residuale delle posizioni;
-
-Consente la riproduzione analitica del calcolo per ogni singola operazione.
+- Ricostruisce la **cronologia completa delle operazioni**  
+- Mantiene il **costo storico residuale**  
+- Consente la **verifica analitica di ogni operazione**
