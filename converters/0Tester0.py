@@ -39,7 +39,8 @@ engine = CryptoTaxEngine(tax_lib, CexName)
 
 df = df.sort_values("timestamp").reset_index(drop=True)
 
-tax_lib.reset_result_file(CexName+'_debug.csv')
+file_path_deb = os.path.join(paths["data"], CexName + '_debug.csv')
+tax_lib.reset_result_file(file_path_deb)
 
 last_balance = {} 
 
@@ -71,8 +72,7 @@ for idx, row in df.iterrows():
         'File': row.File
     }
     
-    file_path = os.path.join(paths["data"], CexName + '_debug.csv')
-    tax_lib.append_event_to_csv(file_path, save_row)
+    tax_lib.append_event_to_csv(file_path_deb, save_row)
 
 print(last_balance)
     
