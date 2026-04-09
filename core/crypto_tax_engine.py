@@ -28,6 +28,17 @@ class CryptoTaxEngine:
         total_plus ? plusvalenze per anno
         total_minus ? minusvalenze per anno
         redditi_diversi ? redditi staking/airdrop per anno
+
+    ## Disclaimer
+
+        Questo software è fornito a scopo esclusivamente educativo e informativo.
+
+        Non costituisce consulenza fiscale, legale o finanziaria.
+
+        L'utilizzo è sotto la piena responsabilità dell'utente.
+        I risultati devono essere verificati con un professionista qualificato.
+
+
     ============================================================
     '''
     

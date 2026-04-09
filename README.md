@@ -165,3 +165,10 @@ Se vuoi partecipare:
 MaloMax
 
 Progetto nato da un'esigenza reale di ricostruzione fiscale crypto.
+
+
+## AVVISO LEGALE
+- Non costituisce consulenza fiscale
+- Ogni utilizzo deve essere verificato con un commercialista
+- L'autore non è responsabile di errori nei calcoli
+- La fiscalità crypto è complessa e varia per giurisdizione
