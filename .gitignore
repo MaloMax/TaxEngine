@@ -1,2 +1,7 @@
 __pycache__/
 Data/
+.env
+*.csv
+data/
+exports/
+*.json

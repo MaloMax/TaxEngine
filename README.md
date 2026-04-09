@@ -161,6 +161,19 @@ TaxEngine non è un tool “magico”.
 L’obiettivo non è solo ottenere un numero finale,
 ma poter spiegare ogni singolo passaggio del calcolo.
 
+## Disclaimer
+
+Questo software è fornito a scopo esclusivamente educativo e informativo.
+
+Non costituisce consulenza fiscale, legale o finanziaria.
+
+L'utilizzo del software è sotto la piena responsabilità dell'utente.
+L'autore non si assume alcuna responsabilità per eventuali errori,
+omissioni o conseguenze derivanti dall'uso del codice.
+
+I risultati devono essere verificati con un professionista qualificato.
+
+
 Autore
 
 MaloMax

@@ -1,9 +1,11 @@
 """
 import_onchain.py
 Legge i pickle mempool.space e inserisce nel DB transfers.
-Un record per ogni mio indirizzo coinvolto nella tx:
-  - vin  → withdrawal (address = mio indirizzo che spende)
-  - vout → deposit    (address = mio indirizzo che riceve)
+Schema address:
+  withdrawal: address_from = mio indirizzo che spende
+              address_to   = tutti gli output non miei (| separati)
+  deposit:    address_from = tutti gli input (| separati)
+              address_to   = mio indirizzo che riceve
 Fee totale memorizzata sul deposit.
 """
 
@@ -73,20 +75,21 @@ def get_all_txs(address, sleep=0.2):
 def init_db(conn):
     conn.execute('''
         CREATE TABLE IF NOT EXISTS transfers (
-            id          TEXT PRIMARY KEY,
-            type        TEXT NOT NULL,
-            asset       TEXT NOT NULL,
-            qty         REAL NOT NULL,
-            fee         REAL DEFAULT 0,
-            timestamp   INTEGER NOT NULL,
-            exchange    TEXT,
-            txid        TEXT,
-            address     TEXT,
-            linked_id   TEXT,
-            source      TEXT DEFAULT 'cex',
-            status      TEXT DEFAULT 'unmatched',
-            source_file TEXT,
-            source_idx  INTEGER
+            id           TEXT PRIMARY KEY,
+            type         TEXT NOT NULL,
+            asset        TEXT NOT NULL,
+            qty          REAL NOT NULL,
+            fee          REAL DEFAULT 0,
+            timestamp    INTEGER NOT NULL,
+            exchange     TEXT,
+            txid         TEXT,
+            address_from TEXT,
+            address_to   TEXT,
+            linked_id    TEXT,
+            source       TEXT DEFAULT 'cex',
+            status       TEXT DEFAULT 'unmatched',
+            source_file  TEXT,
+            source_idx   INTEGER
         )
     ''')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_asset_ts ON transfers(asset, timestamp)')
@@ -107,45 +110,67 @@ def parse_tx(tx, my_addresses):
     fee     = tx.get("fee", 0)
     records = []
 
-    # withdrawal: ogni mio indirizzo in input
+    # raccogli tutti gli input e output
+    all_inputs  = []   # (address, value)
+    all_outputs = []   # (address, value)
+
     for vin in tx["vin"]:
         prev = vin.get("prevout") or {}
         addr = prev.get("scriptpubkey_address")
         val  = prev.get("value", 0)
-        if addr and addr in my_addresses:
-            records.append({
-                'id':        f"onchain_withdrawal_{txid}_{addr}",
-                'type':      'withdrawal',
-                'asset':     'BTC',
-                'qty':       val / 1e8,
-                'fee':       0.0,
-                'timestamp': ts,
-                'exchange':  None,
-                'txid':      txid,
-                'address':   addr,
-                'linked_id': None,
-                'source':    'onchain',
-                'status':    'unmatched',
-            })
+        if addr:
+            all_inputs.append((addr, val))
 
-    # deposit: ogni mio indirizzo in output
     for vout in tx["vout"]:
         addr = vout.get("scriptpubkey_address")
         val  = vout.get("value", 0)
-        if addr and addr in my_addresses:
+        if addr:
+            all_outputs.append((addr, val))
+
+    # address_from per deposit = tutti gli input (| separati)
+    all_input_addrs = '|'.join(a for a, _ in all_inputs) if all_inputs else None
+
+    # address_to per withdrawal = tutti gli output non miei (| separati)
+    non_my_output_addrs = '|'.join(
+        a for a, _ in all_outputs if a not in my_addresses
+    ) or None
+
+    # withdrawal: ogni mio indirizzo in input
+    for addr, val in all_inputs:
+        if addr in my_addresses:
             records.append({
-                'id':        f"onchain_deposit_{txid}_{addr}",
-                'type':      'deposit',
-                'asset':     'BTC',
-                'qty':       val / 1e8,
-                'fee':       fee / 1e8,
-                'timestamp': ts,
-                'exchange':  None,
-                'txid':      txid,
-                'address':   addr,
-                'linked_id': None,
-                'source':    'onchain',
-                'status':    'unmatched',
+                'id':           f"onchain_withdrawal_{txid}_{addr}",
+                'type':         'withdrawal',
+                'asset':        'BTC',
+                'qty':          val / 1e8,
+                'fee':          0.0,
+                'timestamp':    ts,
+                'exchange':     None,
+                'txid':         txid,
+                'address_from': addr,
+                'address_to':   non_my_output_addrs,
+                'linked_id':    None,
+                'source':       'onchain',
+                'status':       'unmatched',
+            })
+
+    # deposit: ogni mio indirizzo in output
+    for addr, val in all_outputs:
+        if addr in my_addresses:
+            records.append({
+                'id':           f"onchain_deposit_{txid}_{addr}",
+                'type':         'deposit',
+                'asset':        'BTC',
+                'qty':          val / 1e8,
+                'fee':          fee / 1e8,
+                'timestamp':    ts,
+                'exchange':     None,
+                'txid':         txid,
+                'address_from': all_input_addrs,
+                'address_to':   addr,
+                'linked_id':    None,
+                'source':       'onchain',
+                'status':       'unmatched',
             })
 
     return records
@@ -158,10 +183,10 @@ def insert_record(conn, rec):
         conn.execute('''
             INSERT OR IGNORE INTO transfers
             (id, type, asset, qty, fee, timestamp, exchange, txid,
-             address, linked_id, source, status)
+             address_from, address_to, linked_id, source, status)
             VALUES
             (:id,:type,:asset,:qty,:fee,:timestamp,:exchange,:txid,
-             :address,:linked_id,:source,:status)
+             :address_from,:address_to,:linked_id,:source,:status)
         ''', rec)
         return conn.execute('SELECT changes()').fetchone()[0]
     except sqlite3.Error as e:

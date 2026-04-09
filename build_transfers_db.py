@@ -2,6 +2,10 @@
 build_transfers_db.py
 Legge tutti i file *_event.csv dalla cartella Events,
 estrae solo deposit e withdrawal, e popola il DB transfers.db
+
+Schema address per record CEX:
+  withdrawal: address_from = None, address_to = indirizzo destinazione
+  deposit:    address_from = indirizzo mittente, address_to = None
 """
 
 import os
@@ -21,20 +25,21 @@ SKIP_ASSETS      = {'EUR', 'MXN'}
 def init_db(conn):
     conn.execute('''
         CREATE TABLE IF NOT EXISTS transfers (
-            id          TEXT PRIMARY KEY,
-            type        TEXT NOT NULL,
-            asset       TEXT NOT NULL,
-            qty         REAL NOT NULL,
-            fee         REAL DEFAULT 0,
-            timestamp   INTEGER NOT NULL,
-            exchange    TEXT,
-            txid        TEXT,
-            address     TEXT,
-            linked_id   TEXT,
-            source      TEXT DEFAULT 'cex',
-            status      TEXT DEFAULT 'unmatched',
-            source_file TEXT,
-            source_idx  INTEGER
+            id           TEXT PRIMARY KEY,
+            type         TEXT NOT NULL,
+            asset        TEXT NOT NULL,
+            qty          REAL NOT NULL,
+            fee          REAL DEFAULT 0,
+            timestamp    INTEGER NOT NULL,
+            exchange     TEXT,
+            txid         TEXT,
+            address_from TEXT,
+            address_to   TEXT,
+            linked_id    TEXT,
+            source       TEXT DEFAULT 'cex',
+            status       TEXT DEFAULT 'unmatched',
+            source_file  TEXT,
+            source_idx   INTEGER
         )
     ''')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_asset_ts ON transfers(asset, timestamp)')
@@ -89,6 +94,11 @@ def to_float(val):
         return 0.0
 
 
+def clean_address(val):
+    s = str(val or '').strip()
+    return None if s in ('-', 'nan', 'None', '') else s
+
+
 def build_record(row):
     typ      = row['type'].strip().lower()
     typ_norm = 'withdrawal' if typ in TYPES_WITHDRAWAL else 'deposit'
@@ -103,24 +113,29 @@ def build_record(row):
     if qty == 0:
         qty = to_float(row.get('qty_b', 0))
 
-    address = str(row.get('address', '') or '').strip()
-    address = None if address in ('-', 'nan', 'None', '') else address
+    address = clean_address(row.get('address'))
+
+    # withdrawal CEX: address_to = indirizzo destinazione
+    # deposit CEX:    address_from = indirizzo mittente
+    address_from = address if typ_norm == 'deposit'    else None
+    address_to   = address if typ_norm == 'withdrawal' else None
 
     return {
-        'id':          make_id(row, typ_norm),
-        'type':        typ_norm,
-        'asset':       asset,
-        'qty':         abs(qty),
-        'fee':         abs(to_float(row.get('fee', 0))),
-        'timestamp':   int(to_float(row.get('timestamp', 0))),
-        'exchange':    str(row.get('Exchange', '')),
-        'txid':        None,
-        'address':     address,
-        'linked_id':   None,
-        'source':      'cex',
-        'status':      'unmatched',
-        'source_file': row.get('source_file', ''),
-        'source_idx':  int(row.get('source_idx', 0)),
+        'id':           make_id(row, typ_norm),
+        'type':         typ_norm,
+        'asset':        asset,
+        'qty':          abs(qty),
+        'fee':          abs(to_float(row.get('fee', 0))),
+        'timestamp':    int(to_float(row.get('timestamp', 0))),
+        'exchange':     str(row.get('Exchange', '')),
+        'txid':         None,
+        'address_from': address_from,
+        'address_to':   address_to,
+        'linked_id':    None,
+        'source':       'cex',
+        'status':       'unmatched',
+        'source_file':  row.get('source_file', ''),
+        'source_idx':   int(row.get('source_idx', 0)),
     }, None
 
 
@@ -139,10 +154,12 @@ def populate_db(conn, df):
             conn.execute('''
                 INSERT OR IGNORE INTO transfers
                 (id, type, asset, qty, fee, timestamp, exchange, txid,
-                 address, linked_id, source, status, source_file, source_idx)
+                 address_from, address_to, linked_id, source, status,
+                 source_file, source_idx)
                 VALUES
                 (:id,:type,:asset,:qty,:fee,:timestamp,:exchange,:txid,
-                 :address,:linked_id,:source,:status,:source_file,:source_idx)
+                 :address_from,:address_to,:linked_id,:source,:status,
+                 :source_file,:source_idx)
             ''', rec)
             inserted += conn.execute('SELECT changes()').fetchone()[0]
         except sqlite3.Error as e:
