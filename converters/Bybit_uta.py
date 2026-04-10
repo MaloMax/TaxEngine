@@ -13,6 +13,8 @@ NomeRepFiles = [
     "Bybit_AssetChangeDetails_uta_154570665_20250101_20251231_0.csv",
 ]
 CexName = "Bybit"
+skiprows = 1
+
 nome_file = Path(__file__).stem
 
 paths = con_lib.get_cex_paths(CexName)
@@ -23,7 +25,7 @@ con_lib.reset_result_file(EventsFile)
 dfs = []
 for f in NomeRepFiles:
     path = os.path.join(paths["report"], f)
-    df_tmp = pd.read_csv(path, skiprows=1, on_bad_lines='skip', keep_default_na=False)
+    df_tmp = pd.read_csv(path, skiprows=skiprows, on_bad_lines='skip', keep_default_na=False)
     df_tmp["_file"] = f
     df_tmp["_line"] = range(len(df_tmp))  # indice riga file originale
     dfs.append(df_tmp)
