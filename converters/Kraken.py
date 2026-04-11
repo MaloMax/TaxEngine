@@ -3,16 +3,22 @@ import os
 import pandas as pd
 from pathlib import Path
 
-def run(filepaths, progress_callback=None):
-    
-    LIBRARY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "core")
-    sys.path.append(LIBRARY_DIR)
+LIBRARY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "core")
+sys.path.append(LIBRARY_DIR)
 
-    from converter_lib import con_lib
+from converter_lib import con_lib
+
+def run(filepaths, progress_callback=None):
 
     NomeRepFiles = filepaths
     CexName = "Kraken"
     skiprows = 0
+    
+    TYPE_MAP = {
+        "promo_credit": "reward",
+        "staking_reward": "reward",
+        "airdrop": "airdrop",
+    }
 
     paths = con_lib.get_cex_paths(CexName)
     nome_file = Path(__file__).stem
@@ -37,8 +43,12 @@ def run(filepaths, progress_callback=None):
     #txid	refid	time	type	subtype	aclass	subclass	asset	wallet	amount	fee	balance	address
 
     idx = 0
+    total = len(df)
 
     while idx < len(df):
+        
+        if progress_callback:
+            progress_callback(idx, total)
 
         row = df.iloc[idx]
 
@@ -55,6 +65,7 @@ def run(filepaths, progress_callback=None):
             event = {
                 'timestamp': row.timestamp,
                 'type': 'buy' if con_lib.to_float(row.amount) > 0 else 'sell',
+                'raw_type': row.type,
                 'asset': row.asset,
                 'qty': con_lib.to_float(row.amount),
                 'fee': con_lib.to_float(row.fee),
@@ -68,8 +79,9 @@ def run(filepaths, progress_callback=None):
 
 
             event = {
-                'timestamp': row.timestamp,
-                'type': row.type,
+                'timestamp': row.timestamp,                
+                'type': TYPE_MAP.get(row.type, row.type),
+                'raw_type': row.type,
                 'asset': row.asset,
                 'qty': con_lib.to_float(row.amount),
                 'fee': con_lib.to_float(row.fee),
@@ -84,13 +96,15 @@ def run(filepaths, progress_callback=None):
         save_row = {
             **event,
             'Exchange':CexName,
-            'idx': idx+skiprows,
-            '_file': row._file,
-            '_line': row._line
+            '_line': row._line,
+            '_file': row._file
         }
 
         con_lib.append_event_to_csv(EventsFile,save_row )
 
+    if progress_callback:
+        progress_callback(total, total)
+        
     print('Finito')
     return EventsFile
 

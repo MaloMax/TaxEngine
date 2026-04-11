@@ -2,92 +2,86 @@ import sys
 import os
 import pandas as pd
 import glob
-
+    
 LIBRARY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "core")
 sys.path.append(LIBRARY_DIR)
 
 from crypto_tax_lib import tax_lib
 from crypto_tax_engine import CryptoTaxEngine
 
-CexName = "Bybit"
-
-paths = tax_lib.get_cex_paths(CexName)
-
-pattern = os.path.join(paths["events"], CexName+"*_event.csv")
-
-# Trova tutti i file
-files = glob.glob(pattern)
-
-print("File trovati:")
-for f in files:
-    print(f)
-
-# Carica e unisci
-df_list = []
-
-for file in files:
-    df_sing = pd.read_csv(file)
-    df_sing["_event_file"] = os.path.basename(file)
-    df_list.append(df_sing)
-   
+def run(filepaths, progress_callback=None):
     
-# Unione finale
-df = pd.concat(df_list, ignore_index=True)
+    # Carica e unisci
+    df_list = []
+
+    for file in filepaths:
+        df_sing = pd.read_csv(file)
+        df_sing["_fileTest"] = file
+        df_sing["_lineTest"] = range(len(df_sing))  # indice riga file originale
+        df_list.append(df_sing)
+
+    # Unione finale
+    df = pd.concat(df_list, ignore_index=True)
+    df = df.sort_values("timestamp").reset_index(drop=True)
+
+    engine = CryptoTaxEngine(tax_lib)
+
+    Data_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Data")
+    file_path_deb = os.path.join(Data_DIR,  '_debug.csv')
+    tax_lib.reset_result_file(file_path_deb)
+
+    last_balance = {} 
+    total = len(df)
+
+    for idx, row in df.iterrows():
+
+        if progress_callback:
+            progress_callback(idx, total)
+
+        result = engine.process_event(row)
 
 
-engine = CryptoTaxEngine(tax_lib, CexName)
+        save_row = {
+            'idx': idx,
+            **row,
+            **result,
+            '_lineTest': row._lineTest,
+            '_fileTest': row._fileTest
+        }
 
-df = df.sort_values("timestamp").reset_index(drop=True)
-
-file_path_deb = os.path.join(paths["data"], CexName + '_debug.csv')
-tax_lib.reset_result_file(file_path_deb)
-
-last_balance = {} 
-
-for idx, row in df.iterrows():
-    
-    
-    event = {
-        'timestamp': row.timestamp,
-        'type': row.type,
-        'asset': row.asset,
-        'qty': row.qty,
-        'fee': row.fee,
-        'asset_b': row.asset_b,
-        'qty_b': row.qty_b,
-        'fee_b': row.fee_b,
-        'address': row.get('address', '')
-    }
-
-            
-    result = engine.process_event(event)
-    
-    
-            
+        tax_lib.append_event_to_csv(file_path_deb, save_row)
         
-    save_row = {
-        'idx': idx,
-        **event,
-        **result,
-        'File': row.File
-    }
-    
-    tax_lib.append_event_to_csv(file_path_deb, save_row)
 
-print(last_balance)
-    
-engine.finalize()
-report = engine.build_report()
-engine.debug_state()
+    print(last_balance)
 
-df_finale = pd.DataFrame(report)
+    engine.finalize()
+    report = engine.build_report()
+    engine.debug_state()
 
-print("\n### TABELLA RIASSUNTO ###")
-print(df_finale.to_markdown(index=False))
+    df_finale = pd.DataFrame(report)
 
+    print("\n### TABELLA RIASSUNTO ###")
+    print(df_finale.to_markdown(index=False))
 
-tax_lib.report_status()
-   
+    tax_lib.report_status()
+
+    if progress_callback:
+        progress_callback(idx, total)
         
+if __name__ == "__main__":
         
+    CexName = "Kraken"
+
+    paths = tax_lib.get_cex_paths(CexName)
+
+    pattern = os.path.join(paths["events"], CexName+"*_event.csv")
+
+    # Trova tutti i file
+    files = glob.glob(pattern)
+
+    print("File trovati:")
+    for f in files:
+        print(f)
+    
+    run(files)  
         

@@ -30,7 +30,7 @@ def detect_cex(file):
 
 # ====== GLOBAL ======
 selected_files = []
-
+generated_event_files = []
 
 # ====== LOG ======
 def log(msg):
@@ -94,6 +94,26 @@ def remove_selected():
 
 
 # ====== RUN ======
+
+def run_test():
+    if not generated_event_files:
+        messagebox.showwarning("Attenzione", "Nessun file eventi da testare")
+        return
+
+    try:
+        log("🧪 Avvio TEST...")
+
+        mod = importlib.import_module("converters.0Tester0")
+
+        mod.run(generated_event_files, progress_callback=update_progress)
+
+        log("✅ TEST completato")
+
+    except Exception as e:
+        log(f"❌ TEST errore: {e}")
+        messagebox.showerror("Errore", str(e))
+        
+        
 def start_conversion():
     if not selected_files:
         messagebox.showwarning("Attenzione", "Nessun file selezionato")
@@ -120,7 +140,14 @@ def start_conversion():
 
             output = mod.run(files, progress_callback=update_progress)
 
+            # salva output
+            if isinstance(output, list):
+                generated_event_files.extend(output)
+            else:
+                generated_event_files.append(output)
+
             log(f"✅ {cex} completato: {output}")
+
 
         progress["value"] = 100
 
@@ -161,7 +188,7 @@ frame_btn.pack(pady=5)
 tk.Button(frame_btn, text="Aggiungi file", command=scegli_file).pack(side="left", padx=5)
 tk.Button(frame_btn, text="Rimuovi", command=remove_selected).pack(side="left", padx=5)
 tk.Button(frame_btn, text="START", command=start_conversion).pack(side="left", padx=5)
-
+tk.Button(frame_btn, text="TEST", command=run_test).pack(side="left", padx=5)
 # progress
 progress = ttk.Progressbar(root, orient="horizontal", length=650, mode="determinate")
 progress.pack(pady=10)

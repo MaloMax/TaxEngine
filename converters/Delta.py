@@ -3,12 +3,19 @@ import os
 import pandas as pd
 from pathlib import Path
 
+LIBRARY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "core")
+sys.path.append(LIBRARY_DIR)
+
+from converter_lib import con_lib
+    
 def run(filepaths, progress_callback=None):
     
-    LIBRARY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "core")
-    sys.path.append(LIBRARY_DIR)
-
-    from converter_lib import con_lib
+    TYPE_MAP = {
+        "promo_credit": "reward",
+        "staking_reward": "reward",
+        "airdrop": "airdrop",
+    }
+    
 
     NomeRepFiles = filepaths
     CexName = "Delta"
@@ -93,6 +100,7 @@ def run(filepaths, progress_callback=None):
             event = {
                 'timestamp': row.timestamp,
                 'type': 'buy' if amount > 0 else 'sell',
+                'raw_type': row.type,
                 'asset': row.asset,
                 'qty': amount,
                 'fee': fee,
@@ -104,10 +112,11 @@ def run(filepaths, progress_callback=None):
 
         else:
 
-
+            
             event = {
                 'timestamp': row.timestamp,
-                'type': row.type,
+                'type': TYPE_MAP.get(row.type, row.type),
+                'raw_type': row.type,
                 'asset': row.asset,
                 'qty': con_lib.to_float(row.Amount),
                 'fee': 0.0,
@@ -122,9 +131,8 @@ def run(filepaths, progress_callback=None):
         save_row = {
             **event,
             'Exchange':CexName,
-            'idx': idx+skiprows,
-            '_file': row._file,
-            '_line': row._line
+            '_line': row._line,
+            '_file': row._file
         }
 
         con_lib.append_event_to_csv(EventsFile,save_row )
@@ -133,7 +141,6 @@ def run(filepaths, progress_callback=None):
         progress_callback(total, total)
         
     print('Finito')
-    
     return EventsFile
 
 if __name__ == "__main__":

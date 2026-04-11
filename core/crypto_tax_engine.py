@@ -43,11 +43,10 @@ class CryptoTaxEngine:
     '''
     
     
-    def __init__(self, tax_lib, exchange_name):
+    def __init__(self, tax_lib):
 
         # Riferimento alla libreria fiscale (DB, prezzi, match depositi)
         self.tax_lib = tax_lib
-        self.exchange = exchange_name
         self.debug = False
 
         # ============================================================
@@ -163,6 +162,7 @@ class CryptoTaxEngine:
         ts = self.tax_lib.to_timestamp(event['timestamp'])
         year = datetime.utcfromtimestamp(ts).year
         typ = event['type']
+        exchange = event.get('Exchange', '')
         tsStr = str(ts)
         plus = 0
         diversi = 0
@@ -316,7 +316,7 @@ class CryptoTaxEngine:
 
                 self.tax_lib.registra_prelievo(
                     asset, address, abs(qty),
-                    unit_cost, ts, self.exchange
+                    unit_cost, ts, exchange
                 )
 
             self.diversi_minus[year] += fee * self.tax_lib.price_lib.prezzo(asset, ts)
@@ -331,7 +331,7 @@ class CryptoTaxEngine:
 
         elif typ.upper() == 'DEPOSIT':
             
-            print(event)
+            #print(event)
             qty = qty if qty else qty_b    # in caso di euro a volte e' in qty_b
             qty_in = abs(qty) - fee
 
@@ -339,7 +339,7 @@ class CryptoTaxEngine:
                 address = event.get('address', 'unknown')
                 match = self.tax_lib.match_deposito(
                     asset, address, qty,
-                    self.exchange, ts
+                    exchange, ts
                 )
                 cost = 0
                 if match['matched']:
@@ -430,8 +430,7 @@ class CryptoTaxEngine:
                 'plus': self.total_plus.get(year, 0),
                 'minus': self.total_minus.get(year, 0),
                 'diversi_plus': self.diversi_plus.get(year, 0),
-                'diversi_minus': self.diversi_minus.get(year, 0),
-                'exchange': self.exchange
+                'diversi_minus': self.diversi_minus.get(year, 0)
             })
 
 

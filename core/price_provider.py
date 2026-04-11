@@ -302,25 +302,25 @@ class PriceProvider:
     # =========================
     # DB
     # =========================
-    def _get_price_db(self, asset, timestamp):
-                
-        timestamp = self.normalize_hour(timestamp)
+    def _get_price_db(self, asset, timestamp, tolerance=900):
         
         asset = asset.upper()
         c = self.conn.cursor()
-
-        # prende ultimo prezzo disponibile <= timestamp
+        
         c.execute("""
-            SELECT price FROM prices
-            WHERE symbol=? AND timestamp=?
-        """, (asset, timestamp))
-
+            SELECT price, timestamp
+            FROM prices
+            WHERE symbol=?
+              AND ABS(timestamp - ?) <= ?
+            ORDER BY ABS(timestamp - ?), timestamp DESC
+            LIMIT 1
+        """, (asset, timestamp, tolerance, timestamp))
+        
+        
         row = c.fetchone()
         return row[0] if row else None
 
     def _save_price_db(self, asset, timestamp, price):
-        
-        timestamp = self.normalize_hour(timestamp)
 
         c = self.conn.cursor()
         c.execute("""
@@ -342,21 +342,7 @@ class PriceProvider:
     def isTax(self, asset):
         return asset.upper() in ('EUR','USD', 'USDT', 'USDC', 'DAI', 'MXN')
     
-    def normalize_hour(self, ts):
-        """
-        Rimuove minuti e secondi.
-        Mantiene anno-mese-giorno-ora.
-        Ritorna timestamp unix (secondi).
-        """
-        if ts > 1e12:  # millisecondi
-            ts = ts / 1000
 
-        dt = datetime.utcfromtimestamp(ts)
-        dt = dt.replace(minute=0, second=0, microsecond=0)
-        
-        return int(dt.timestamp())
-    
-    
     def normalize_day(self, ts):
             
         """
