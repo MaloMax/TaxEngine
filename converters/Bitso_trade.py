@@ -8,44 +8,67 @@ sys.path.append(LIBRARY_DIR)
 
 from converter_lib import con_lib
 
-NomeRepFile = "trading_Bitso.csv"
-CexName = "Bitso"
-skiprows = 0
-
-paths = con_lib.get_cex_paths(CexName)
-nome_file = Path(__file__).stem
-
-ReportFile = os.path.join(paths["report"], NomeRepFile)
-EventsFile = os.path.join(paths["events"], f"{nome_file}_event.csv")
-
-
-con_lib.reset_result_file(EventsFile)
-
-df = pd.read_csv(ReportFile, skiprows=skiprows, on_bad_lines='skip')
-  
-df.columns = ['type', 'major', 'minor', 'amount', 'rate', 'value', 'fee', 'total', 'timestamp', 'datetime']  
-
-for idx, row in df.iterrows():
-          
-    event = {
-        'timestamp': con_lib.to_timestamp(row.timestamp),
-        'type': row.type,
-        'asset': row.major,
-        'qty': con_lib.to_float(row.amount),
-        'fee': con_lib.to_float(row.fee) if row.type == 'buy' else 0.0,
-        'asset_b': row.minor,
-        'qty_b': con_lib.to_float(row.value),
-        'fee_b': con_lib.to_float(row.fee) if row.type == 'sell' else 0.0,
-        'address': row.get('address', '')
-    }
-
-    save_row = {
-        **event,
-        'Exchange':CexName,
-        'idx': idx+skiprows,
-        'File': NomeRepFile
-    }
+def run(filepaths, progress_callback=None):
     
-    con_lib.append_event_to_csv(EventsFile,save_row )
+    CexName = "Bitso"
+    skiprows = 0
+    
+    paths = con_lib.get_cex_paths(CexName)
+    nome_file = Path(__file__).stem
+    
+    EventsFile = os.path.join(paths["events"], f"{nome_file}_event.csv")
+    
+    con_lib.reset_result_file(EventsFile)
+    
+    dfs = []
+    for f in filepaths:
+        path = os.path.join(paths["report"], f)
+        df_tmp = pd.read_csv(path, skiprows=skiprows, on_bad_lines='skip')
+        df_tmp["_file"] = f
+        df_tmp["_line"] = range(len(df_tmp))
+        dfs.append(df_tmp)
+    
+    df = pd.concat(dfs, ignore_index=True)
+    
+    df.columns = ['type', 'major', 'minor', 'amount', 'rate', 'value', 'fee', 'total', 'timestamp', 'datetime']  
+    
+    idx = 0
+    total = len(df)
+    
+    for idx, row in df.iterrows():
+        
+        if progress_callback:
+            progress_callback(idx, total)
+              
+        event = {
+            'timestamp': con_lib.to_timestamp(row.timestamp),
+            'type': row.type,
+            'asset': row.major,
+            'qty': con_lib.to_float(row.amount),
+            'fee': con_lib.to_float(row.fee) if row.type == 'buy' else 0.0,
+            'asset_b': row.minor,
+            'qty_b': con_lib.to_float(row.value),
+            'fee_b': con_lib.to_float(row.fee) if row.type == 'sell' else 0.0,
+            'address': row.get('address', '')
+        }
+    
+        save_row = {
+            **event,
+            'Exchange':CexName,
+            '_line': row._line,
+            '_file': row._file
+        }
+        
+        con_lib.append_event_to_csv(EventsFile,save_row )
+    
+    if progress_callback:
+        progress_callback(total, total)
+    
+    print('Finito')
+    return EventsFile
 
-print('Finito')
+if __name__ == "__main__":
+    
+    NomeRepFiles = ["trading_Bitso.csv"]
+    
+    run(NomeRepFiles)

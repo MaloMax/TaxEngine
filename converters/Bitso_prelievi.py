@@ -8,47 +8,67 @@ sys.path.append(LIBRARY_DIR)
 
 from converter_lib import con_lib
 
-NomeRepFile = "prelievi_Bitso.csv"
-CexName = "Bitso"
-skiprows = 0
-
-paths = con_lib.get_cex_paths(CexName)
-nome_file = Path(__file__).stem
-
-ReportFile = os.path.join(paths["report"], NomeRepFile)
-EventsFile = os.path.join(paths["events"], f"{nome_file}_event.csv")
-
-
-con_lib.reset_result_file(EventsFile)
-
-df = pd.read_csv(ReportFile, skiprows=skiprows, on_bad_lines='skip')
-
-df.columns = ['method', 'currency', 'amount', 'timestamp', 'datetime', 'address', 'xrptag']  
-
-for idx, row in df.iterrows():
-
-
-    event = {
-        'timestamp': con_lib.to_timestamp(row.timestamp),
-        'type': 'withdrawal',
-        'asset': row.currency,
-        'qty': con_lib.to_float(row.amount),
-        'fee': 0.0,
-        'asset_b': '',
-        'qty_b': 0,
-        'fee_b': 0,
-        'address': row.address if pd.notna(row.address) else ''
-    }
+def run(filepaths, progress_callback=None):
     
+    CexName = "Bitso"
+    skiprows = 0
     
+    paths = con_lib.get_cex_paths(CexName)
+    nome_file = Path(__file__).stem
+    
+    EventsFile = os.path.join(paths["events"], f"{nome_file}_event.csv")
+    
+    con_lib.reset_result_file(EventsFile)
+    
+    dfs = []
+    for f in filepaths:
+        path = os.path.join(paths["report"], f)
+        df_tmp = pd.read_csv(path, skiprows=skiprows, on_bad_lines='skip')
+        df_tmp["_file"] = f
+        df_tmp["_line"] = range(len(df_tmp))
+        dfs.append(df_tmp)
+    
+    df = pd.concat(dfs, ignore_index=True)
+    
+    df.columns = ['method', 'currency', 'amount', 'timestamp', 'datetime', 'address', 'xrptag']  
+    
+    idx = 0
+    total = len(df)
+    
+    for idx, row in df.iterrows():
         
-    save_row = {
-        **event,
-        'Exchange':CexName,
-        'idx': idx+skiprows,
-        'File': NomeRepFile
-    }
+        if progress_callback:
+            progress_callback(idx, total)
     
-    con_lib.append_event_to_csv(EventsFile,save_row )
+        event = {
+            'timestamp': con_lib.to_timestamp(row.timestamp),
+            'type': 'withdrawal',
+            'asset': row.currency,
+            'qty': con_lib.to_float(row.amount),
+            'fee': 0.0,
+            'asset_b': '',
+            'qty_b': 0,
+            'fee_b': 0,
+            'address': row.address if pd.notna(row.address) else ''
+        }
+        
+        save_row = {
+            **event,
+            'Exchange':CexName,
+            '_line': row._line,
+            '_file': row._file
+        }
+        
+        con_lib.append_event_to_csv(EventsFile,save_row )
+    
+    if progress_callback:
+        progress_callback(total, total)
+    
+    print('Finito')
+    return EventsFile
 
-print('Finito')
+if __name__ == "__main__":
+    
+    NomeRepFiles = ["prelievi_Bitso.csv"]
+    
+    run(NomeRepFiles)

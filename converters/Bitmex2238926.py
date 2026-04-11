@@ -52,95 +52,114 @@ sys.path.append(LIBRARY_DIR)
 
 from converter_lib import con_lib
 
-NomeRepFile = "transaction history 2238926.csv"
-CexName = "Bitmex"
-skiprows = 0
-
-paths = con_lib.get_cex_paths(CexName)
-nome_file = Path(__file__).stem
-
-ReportFile = os.path.join(paths["report"], NomeRepFile)
-EventsFile = os.path.join(paths["events"], f"{nome_file}_event.csv")
-
-
-con_lib.reset_result_file(EventsFile)
-
-df = pd.read_csv(ReportFile, skiprows=skiprows, on_bad_lines='skip')
-
-df["timestamp"] = df["transactTime"].apply(con_lib.to_timestamp)
-df = df.sort_values("timestamp").reset_index(drop=True)
-
-my_wallet_ids = {"2287190", "233348", "2238926", "2217244", "2189738"}
-#currency	transactType	transactTime	amount	fee	address	text	walletBalance	transactID	transactStatus	tx	account
-
-
-idx = 0
-
-while idx < len(df):
-
-    row = df.iloc[idx]
+def run(filepaths, progress_callback=None):
     
-    if row.transactType == 'Transfer':
-        if str(row.address) in my_wallet_ids:
-            idx += 1  
-            continue  # transfer interno, ignoralo
+    CexName = "Bitmex"
+    skiprows = 0
     
-    if row.transactType == 'Transfer' and row.currency != 'BMEx':
-        print(row.currency, row.amount, row.address,  row.account,  row.transactTime)
+    paths = con_lib.get_cex_paths(CexName)
+    nome_file = Path(__file__).stem
+    
+    EventsFile = os.path.join(paths["events"], f"{nome_file}_event.csv")
+    
+    con_lib.reset_result_file(EventsFile)
+    
+    dfs = []
+    for f in filepaths:
+        path = os.path.join(paths["report"], f)
+        df_tmp = pd.read_csv(path, skiprows=skiprows, on_bad_lines='skip')
+        df_tmp["_file"] = f
+        df_tmp["_line"] = range(len(df_tmp))
+        dfs.append(df_tmp)
+    
+    df = pd.concat(dfs, ignore_index=True)
+    
+    df["timestamp"] = df["transactTime"].apply(con_lib.to_timestamp)
+    df = df.sort_values("timestamp").reset_index(drop=True)
+    
+    my_wallet_ids = {"2287190", "233348", "2238926", "2217244", "2189738"}
+    
+    idx = 0
+    total = len(df)
+    
+    while idx < len(df):
+        
+        if progress_callback:
+            progress_callback(idx, total)
+    
+        row = df.iloc[idx]
             
             
-    if row.transactType == 'SpotTrade' or row.transactType == 'Conversion' or row.transactType == 'AutoConversion':
-        idx += 1
-        row2 = df.iloc[idx]
+        if row.transactType == 'Transfer':
+            if str(row.address) in my_wallet_ids:
+                idx += 1  
+                continue
         
+        if row.transactType == 'Transfer' and row.currency != 'BMEx':
+            print(row.currency, row.amount, row.address,  row.account,  row.transactTime)
         
-        if con_lib.isTax(row.currency):
-            if con_lib.isTax(row2.currency):
-                if row.currency.upper() == 'EUR' or con_lib.to_float(row.amount) > 0:
+        if row.transactType == 'SpotTrade' or row.transactType == 'Conversion' or row.transactType == 'AutoConversion':
+            idx += 1
+            row2 = df.iloc[idx]
+            
+            
+            if con_lib.isTax(row.currency):
+                if con_lib.isTax(row2.currency):
+                    if row.currency.upper() == 'EUR' or con_lib.to_float(row.amount) > 0:
+                        row, row2 = row2, row
+                else:
                     row, row2 = row2, row
-            else:
-                row, row2 = row2, row
-        
-        currency1, amount1, fee1 = normalize_bitmex_asset(row.currency, con_lib.to_float(row.amount), con_lib.to_float(row.fee))
-        currency2, amount2, fee2 = normalize_bitmex_asset(row2.currency, con_lib.to_float(row2.amount), con_lib.to_float(row2.fee))
-    
-        event = {
-            'timestamp': row.timestamp,
-            'type': 'buy' if amount1 > 0 else 'sell',
-            'asset': currency1,
-            'qty': amount1,
-            'fee': fee1,
-            'asset_b': currency2,
-            'qty_b': amount2,
-            'fee_b': fee2,
-            'address': ''
-        }
             
-    else:
+            currency1, amount1, fee1 = normalize_bitmex_asset(row.currency, con_lib.to_float(row.amount), con_lib.to_float(row.fee))
+            currency2, amount2, fee2 = normalize_bitmex_asset(row2.currency, con_lib.to_float(row2.amount), con_lib.to_float(row2.fee))
         
-        currency1, amount1, fee1 = normalize_bitmex_asset(row.currency, con_lib.to_float(row.amount), con_lib.to_float(row.fee))
-
-        event = {
-            'timestamp': row.timestamp,
-            'type': row.transactType,
-            'asset': currency1,
-            'qty': amount1,
-            'fee': 0,
-            'asset_b': '',
-            'qty_b': 0,
-            'fee_b': 0.0,
-            'address': row.address if pd.notna(row.address) else ''
-        }
-
-      
-    idx += 1  
-    save_row = {
-        **event,
-        'Exchange':CexName,
-        'idx': idx+skiprows,
-        'File': NomeRepFile
-    }
+            event = {
+                'timestamp': row.timestamp,
+                'type': 'buy' if amount1 > 0 else 'sell',
+                'asset': currency1,
+                'qty': amount1,
+                'fee': fee1,
+                'asset_b': currency2,
+                'qty_b': amount2,
+                'fee_b': fee2,
+                'address': ''
+            }
+                
+        else:
+            
+            currency1, amount1, fee1 = normalize_bitmex_asset(row.currency, con_lib.to_float(row.amount), con_lib.to_float(row.fee))
     
-    con_lib.append_event_to_csv(EventsFile,save_row )
+            event = {
+                'timestamp': row.timestamp,
+                'type': row.transactType,
+                'asset': currency1,
+                'qty': amount1,
+                'fee': 0,
+                'asset_b': '',
+                'qty_b': 0,
+                'fee_b': 0.0,
+                'address': row.address if pd.notna(row.address) else ''
+            }
+    
+          
+        idx += 1  
+        save_row = {
+            **event,
+            'Exchange':CexName,
+            '_line': row._line,
+            '_file': row._file
+        }
+        
+        con_lib.append_event_to_csv(EventsFile,save_row )
+    
+    if progress_callback:
+        progress_callback(total, total)
+    
+    print('Finito')
+    return EventsFile
 
-print('Finito')
+if __name__ == "__main__":
+    
+    NomeRepFiles = ["transaction history 2238926.csv"]
+    
+    run(NomeRepFiles)

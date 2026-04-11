@@ -11,6 +11,22 @@ from tkinterdnd2 import DND_FILES, TkinterDnD
 DETECTORS = {
     "Delta": ["id", "Asset ID", "Asset Symbol", "Amount", "Balance", "Transaction type", "Contract/Fund", "Reference ID", "Date"],
     "Kraken": ["txid", "refid", "time", "type", "subtype", "aclass", "subclass", "asset", "wallet", "amount", "fee", "balance", "address"],
+    "Bitfinex_ledger": ["#", "DESCRIPTION", "CURRENCY", "AMOUNT", "BALANCE", "DATE", "WALLET"],
+    "Bitfinex_move": ["#", "STARTED", "UPDATED", "CURRENCY", "STATUS", "AMOUNT", "FEES", "DESCRIPTION"],
+    "Bitfinex_trade": ["#", "PAIR", "AMOUNT", "PRICE", "FEE", "FEE PERC", "FEE CURRENCY", "DATE", "ORDER ID"],
+    "Bitpanda": ["ID", "Timestamp", "Type", "InOut", "Amt_Fiat", "Fiat"],
+    "Bitso_prelievi": ["method", "currency", "amount", "timestamp", "datetime", "address", "xrptag"],
+    "Bitso_trade": ["type", "major", "minor", "amount", "rate", "value", "fee", "total", "timestamp", "datetime"],
+    "Bitso_versa": ["method", "currency", "gross", "fee", "net_amount", "timestamp", "datetime"],
+    "Bitmex2287190": ["currency", "transactType", "transactTime", "amount", "fee", "address", "text", "walletBalance"],
+    "Bitmex2238926": ["currency", "transactType", "transactTime", "amount", "fee", "address", "text", "walletBalance"],
+    "Bitmex233348": ["currency", "transactType", "transactTime", "amount", "fee", "address", "text", "walletBalance"],
+    "Bittrex_transaction": ["Date", "Currency", "Type", "Address", "Memo/Tag", "TxId", "Amount", "Commission"],
+    "Bittrex_order": ["TXID", "Time (UTC)", "Transaction", "Order Type", "Market", "Base", "Quote", "Price"],
+    "Bybit_fund": ["Uid", "Date & Time(UTC)", "Coin", "QTY", "Type", "Account Balance"],
+    "Bybit_copy": ["Uid", "Date & Time(UTC)", "Coin", "QTY", "Type", "Account Balance"],
+    "Bybit_dep_with": ["Uid", "Date", "Asset", "Amount", "Type", "Wallet Balance", "Received Address"],
+    "Bybit_uta": ["Uid", "Time(UTC)", "Currency", "Action", "Type", "Contract", "Quantity", "Fee Paid"],
 }
 
 
